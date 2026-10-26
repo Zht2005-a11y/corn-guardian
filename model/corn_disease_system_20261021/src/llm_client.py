@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import random
 import re
 from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
@@ -80,6 +81,66 @@ MAX_STOP_HOOK_BLOCKS = 2
 # 截断续写上限：回答被 max_tokens 截断（finish_reason=length）时，自动注入
 # 「从中断处继续」指令的最多次数（对齐 Claude Code 的 MAX_OUTPUT_TOKENS_RECOVERY_LIMIT）
 MAX_RESUME_ROUNDS = 3
+
+# 总轮次硬上限：工具轮次 / 续写 / 打回重答三份额度彼此独立后，仍需要一个总闸
+# 防止「各种额度组合」形成无限循环（语义对齐 Claude Code 的 maxTurns）
+MAX_TOTAL_ROUNDS = 12
+
+# 上游请求重试（对齐 Claude Code query.ts:1007 model_error 的重试语义）
+# 网络抖动不该让整段回答降级成离线模板；仅在「尚未向用户吐出任何内容」时重试，
+# 已流出文字再重试会造成重复输出。
+MAX_LLM_RETRIES = 2
+RETRYABLE_STATUS = {408, 409, 425, 429, 500, 502, 503, 504}
+_RETRYABLE_EXC = (
+    httpx.ConnectError,
+    httpx.ConnectTimeout,
+    httpx.ReadTimeout,
+    httpx.WriteError,
+    httpx.ReadError,
+    httpx.RemoteProtocolError,
+)
+
+# 单次工具结果字符上限：防止检索结果撑爆上下文
+# （对齐 Claude Code constants/toolLimits.ts 的 DEFAULT_MAX_RESULT_SIZE_CHARS 思路，
+#   按其 1/6 收紧——本模型上下文远小于编码场景，5 条摘要通常 1~2K 字）
+MAX_TOOL_RESULT_CHARS = 8000
+
+
+class RetryableError(RuntimeError):
+    """可重试的上游错误（5xx / 429 / 连接中断等）"""
+
+
+def _truncate_tool_result(text: str, limit: int = MAX_TOOL_RESULT_CHARS) -> str:
+    """截断过长的工具结果，并显式告知模型「这里被截断了」"""
+    if not text or len(text) <= limit:
+        return text or ""
+    return text[:limit] + f"\n\n[结果已截断：原文 {len(text)} 字，仅保留前 {limit} 字]"
+
+
+async def _post_with_retry(
+    client: httpx.AsyncClient,
+    url: str,
+    headers: Dict[str, str],
+    body: Dict[str, Any],
+    retries: int = MAX_LLM_RETRIES,
+) -> httpx.Response:
+    """非流式 POST + 指数退避重试（流式路径在生成器内部自行重试）"""
+    last_err: Optional[BaseException] = None
+    for i in range(retries + 1):
+        try:
+            resp = await client.post(url, headers=headers, json=body)
+            if resp.status_code in RETRYABLE_STATUS and i < retries:
+                last_err = RetryableError(f"HTTP {resp.status_code}")
+            else:
+                return resp
+        except _RETRYABLE_EXC as e:
+            last_err = e
+            if i >= retries:
+                raise
+        delay = min(0.8 * (2 ** i), 4.0) + random.uniform(0, 0.3)
+        logger.warning(f"非流式请求失败({last_err})，{delay:.1f}s 后重试(第{i + 1}/{retries}次)")
+        await asyncio.sleep(delay)
+    raise last_err if last_err else RuntimeError("请求失败")
 
 
 # 强制工具调用（对齐 Claude Code `tool_choice: {type:'tool', name:'web_search'}`，
@@ -517,7 +578,7 @@ async def ask_agnes(
     try:
         custom_timeout = httpx.Timeout(timeout=timeout, connect=8.0, read=timeout)
         async with httpx.AsyncClient(trust_env=False, timeout=custom_timeout) as client:
-            response = await client.post(url, headers=headers, json=payload)
+            response = await _post_with_retry(client, url, headers, payload)
             if response.status_code == 200:
                 data = response.json()
                 choice = data["choices"][0]
@@ -530,7 +591,7 @@ async def ask_agnes(
                     except Exception:
                         fn_args = {"query": message}
                     search_query = fn_args.get("query", message)
-                    search_results = await web_search(search_query)
+                    search_results = _truncate_tool_result(await web_search(search_query))
 
                     api_messages.append(choice["message"])
                     api_messages.append({
@@ -539,7 +600,7 @@ async def ask_agnes(
                         "content": search_results,
                     })
 
-                    resp2 = await client.post(url, headers=headers, json={
+                    resp2 = await _post_with_retry(client, url, headers, {
                         "model": model,
                         "messages": api_messages,
                         "temperature": temperature,
@@ -670,105 +731,140 @@ async def stream_ask_agnes(
             force_downgraded = False  # 网关不支持强制 tool_choice 时降级标记
 
             # ── 工具循环：模型每轮请求工具 → 执行检索 → 回填结果继续，直到直接作答或达上限 ──
-            round_idx = 0
-            stop_hook_blocks = 0  # Stop Hook 已拦截次数（stop_hook_active 保护计数）
-            resume_count = 0      # 截断续写已用次数
-            reply_acc = ""        # 跨轮累积的完整回答（供 Stop Hook 校验全貌）
+            # 三份额度彼此独立：此前共用一个 round_idx，导致「截断 3 次 + 打回 2 次」
+            # 就吃掉 6 次工具额度中的 5 次；另设 total_rounds 作总闸（Claude Code maxTurns 语义）
+            tool_rounds = 0        # 已执行的工具轮次，决定是否还下发 tools
+            stop_hook_blocks = 0   # Stop Hook 已拦截次数（stop_hook_active 保护计数）
+            resume_count = 0       # 截断续写已用次数
+            total_rounds = 0       # 总轮次硬上限，防止各额度组合出无限循环
+            reply_acc = ""         # 跨轮累积的完整回答（供 Stop Hook 校验全貌）
             while True:
-                stream_payload = {
-                    "model": model,
-                    "messages": api_messages,
-                    "temperature": temperature,
-                    "max_tokens": max_tokens,
-                    "stream": True,
-                }
-                # 尚有剩余工具轮次就始终声明工具；到达上限后收走工具，强制模型本轮直接作答
-                if round_idx < MAX_TOOL_ROUNDS:
-                    stream_payload["tools"] = [WEB_SEARCH_TOOL]
-                    # 用户明确要求检索 → 首轮强制调用，模型无权拒绝
-                    # （对齐 Claude Code tool_choice: {type:'tool', name:'web_search'}）
-                    stream_payload["tool_choice"] = (
-                        FORCE_SEARCH_CHOICE
-                        if (force_search and round_idx == 0 and not force_downgraded)
-                        else "auto"
-                    )
+                if total_rounds >= MAX_TOTAL_ROUNDS:
+                    logger.warning(f"总轮次达到上限 {MAX_TOTAL_ROUNDS}，强制结束本轮")
+                    break
 
-                tool_calls_acc: Dict[int, Dict[str, Any]] = {}
-                is_tool = False
-                round_content = ""  # 累积本轮流式回答全文，供 Stop Hook 校验
-                finish_reason = None  # 本轮结束原因：None/stop/length/tool_calls
-                guard = PseudoToolCallGuard()  # 拦截正文里的伪工具调用
+                # ── 单轮请求（带指数退避重试）────────────────────────────────
+                # 对齐 Claude Code query.ts:1007 的 model_error 重试语义：网络抖动不该让
+                # 整段回答降级成离线模板。仅在「尚未向用户吐出任何内容」时重试——已流出
+                # 文字再重试会造成重复输出，此时宁可交给兜底。
+                attempt = 0
+                while True:
+                    stream_payload = {
+                        "model": model,
+                        "messages": api_messages,
+                        "temperature": temperature,
+                        "max_tokens": max_tokens,
+                        "stream": True,
+                    }
+                    # 尚有剩余工具轮次就始终声明工具；到达上限后收走工具，强制模型本轮直接作答
+                    if tool_rounds < MAX_TOOL_ROUNDS:
+                        stream_payload["tools"] = [WEB_SEARCH_TOOL]
+                        # 用户明确要求检索 → 首轮强制调用，模型无权拒绝
+                        # （对齐 Claude Code tool_choice: {type:'tool', name:'web_search'}）
+                        stream_payload["tool_choice"] = (
+                            FORCE_SEARCH_CHOICE
+                            if (force_search and total_rounds == 0 and not force_downgraded)
+                            else "auto"
+                        )
 
-                async with client.stream("POST", url, headers=headers, json=stream_payload) as stream_resp:
-                    if stream_resp.status_code != 200:
-                        # 部分 OpenAI 兼容网关不支持强制 tool_choice，会直接 400/422：
-                        # 降级为 auto 重试一次，避免整轮掉进离线兜底
-                        if stream_resp.status_code in (400, 422) and not force_downgraded \
-                                and stream_payload.get("tool_choice") == FORCE_SEARCH_CHOICE:
-                            force_downgraded = True
-                            logger.warning("网关拒绝强制 tool_choice，降级为 auto 重试")
-                            continue
-                        raise RuntimeError(f"Stream HTTP {stream_resp.status_code}")
+                    # 每次尝试都重置本轮状态，避免失败的半截数据污染重试
+                    tool_calls_acc: Dict[int, Dict[str, Any]] = {}
+                    is_tool = False
+                    round_content = ""    # 累积本轮流式回答全文，供 Stop Hook 校验
+                    finish_reason = None  # 本轮结束原因：None/stop/length/tool_calls
+                    guard = PseudoToolCallGuard()  # 拦截正文里的伪工具调用
+                    emitted = False       # 是否已向用户吐出内容（决定能否安全重试）
+                    attempt_error: Optional[BaseException] = None
 
-                    async for line in stream_resp.aiter_lines():
-                        if not line:
-                            continue
-                        if line.startswith("data: ") and not line.endswith("[DONE]"):
-                            chunk_raw = line[6:].strip()
-                            try:
-                                chunk_json = json.loads(chunk_raw)
-                                choices = chunk_json.get("choices")
-                                if not choices:
+                    try:
+                        async with client.stream("POST", url, headers=headers, json=stream_payload) as stream_resp:
+                            if stream_resp.status_code != 200:
+                                # 部分 OpenAI 兼容网关不支持强制 tool_choice，会直接 400/422：
+                                # 降级为 auto 重试一次，避免整轮掉进离线兜底
+                                if stream_resp.status_code in (400, 422) and not force_downgraded \
+                                        and stream_payload.get("tool_choice") == FORCE_SEARCH_CHOICE:
+                                    force_downgraded = True
+                                    logger.warning("网关拒绝强制 tool_choice，降级为 auto 重试")
                                     continue
-                                delta = choices[0].get("delta", {})
-                                if choices[0].get("finish_reason"):
-                                    finish_reason = choices[0]["finish_reason"]
+                                if stream_resp.status_code in RETRYABLE_STATUS:
+                                    raise RetryableError(f"Stream HTTP {stream_resp.status_code}")
+                                raise RuntimeError(f"Stream HTTP {stream_resp.status_code}")
 
-                                # 判定是否触发 tool_calls
-                                if "tool_calls" in delta and delta["tool_calls"]:
-                                    is_tool = True
-                                    for tc in delta["tool_calls"]:
-                                        idx = tc.get("index", 0)
-                                        if idx not in tool_calls_acc:
-                                            tool_calls_acc[idx] = {
-                                                "id": tc.get("id", ""),
-                                                "name": tc.get("function", {}).get("name", ""),
-                                                "arguments": "",
-                                            }
-                                        if tc.get("id"):
-                                            tool_calls_acc[idx]["id"] = tc["id"]
-                                        if tc.get("function", {}).get("name"):
-                                            tool_calls_acc[idx]["name"] = tc["function"]["name"]
-                                        if tc.get("function", {}).get("arguments"):
-                                            tool_calls_acc[idx]["arguments"] += tc["function"]["arguments"]
+                            async for line in stream_resp.aiter_lines():
+                                if not line:
                                     continue
+                                if line.startswith("data: ") and not line.endswith("[DONE]"):
+                                    chunk_raw = line[6:].strip()
+                                    try:
+                                        chunk_json = json.loads(chunk_raw)
+                                        choices = chunk_json.get("choices")
+                                        if not choices:
+                                            continue
+                                        delta = choices[0].get("delta", {})
+                                        if choices[0].get("finish_reason"):
+                                            finish_reason = choices[0]["finish_reason"]
 
-                                # 正常内容流式推送（先过伪工具调用拦截器）
-                                content_piece = delta.get("content", "")
-                                if content_piece:
-                                    safe_piece = guard.feed(content_piece)
-                                    if safe_piece:
-                                        round_content += safe_piece
-                                        yield f"data: {json.dumps({'type': 'delta', 'content': safe_piece}, ensure_ascii=False)}\n\n"
-                            except Exception:
-                                continue
+                                        # 判定是否触发 tool_calls
+                                        if "tool_calls" in delta and delta["tool_calls"]:
+                                            is_tool = True
+                                            for tc in delta["tool_calls"]:
+                                                idx = tc.get("index", 0)
+                                                if idx not in tool_calls_acc:
+                                                    tool_calls_acc[idx] = {
+                                                        "id": tc.get("id", ""),
+                                                        "name": tc.get("function", {}).get("name", ""),
+                                                        "arguments": "",
+                                                    }
+                                                if tc.get("id"):
+                                                    tool_calls_acc[idx]["id"] = tc["id"]
+                                                if tc.get("function", {}).get("name"):
+                                                    tool_calls_acc[idx]["name"] = tc["function"]["name"]
+                                                if tc.get("function", {}).get("arguments"):
+                                                    tool_calls_acc[idx]["arguments"] += tc["function"]["arguments"]
+                                            continue
 
-                    # 流结束：冲刷拦截器剩余文本（未闭合的伪工具调用块也在此被回收）
-                    tail_piece = guard.flush()
-                    if tail_piece:
-                        round_content += tail_piece
-                        yield f"data: {json.dumps({'type': 'delta', 'content': tail_piece}, ensure_ascii=False)}\n\n"
+                                        # 正常内容流式推送（先过伪工具调用拦截器）
+                                        content_piece = delta.get("content", "")
+                                        if content_piece:
+                                            safe_piece = guard.feed(content_piece)
+                                            if safe_piece:
+                                                round_content += safe_piece
+                                                emitted = True
+                                                yield f"data: {json.dumps({'type': 'delta', 'content': safe_piece}, ensure_ascii=False)}\n\n"
+                                    except Exception:
+                                        continue
+
+                            # 流结束：冲刷拦截器剩余文本（未闭合的伪工具调用块也在此被回收）
+                            tail_piece = guard.flush()
+                            if tail_piece:
+                                round_content += tail_piece
+                                emitted = True
+                                yield f"data: {json.dumps({'type': 'delta', 'content': tail_piece}, ensure_ascii=False)}\n\n"
+                    except (RetryableError, *_RETRYABLE_EXC) as e:
+                        attempt_error = e
+
+                    if attempt_error is None:
+                        break  # 本轮请求成功，进入后处理
+
+                    if emitted or attempt >= MAX_LLM_RETRIES:
+                        raise attempt_error  # 已吐字或重试耗尽 → 交给外层兜底
+
+                    attempt += 1
+                    delay = min(0.8 * (2 ** (attempt - 1)), 4.0) + random.uniform(0, 0.3)
+                    logger.warning(f"上游请求失败({attempt_error})，{delay:.1f}s 后重试(第{attempt}/{MAX_LLM_RETRIES}次)")
+                    yield f"data: {json.dumps({'type': 'retry', 'attempt': attempt, 'max': MAX_LLM_RETRIES}, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(delay)
 
                 # ── 伪工具调用修复：模型把调用写成了正文而非原生 tool_calls ──
                 # 拦截器已把那段伪代码从用户可见文本中摘掉，这里补成一次真实检索，
                 # 让「说查却没查」变成「真的查了」。Claude Code 不需要这层兜底——它的上游
                 # 必定返回原生 tool_use 块；OpenAI 兼容网关降级/模型未拿到 tools 时才需要。
-                if guard.query and not (is_tool and tool_calls_acc) and round_idx < MAX_TOOL_ROUNDS:
+                if guard.query and not (is_tool and tool_calls_acc) and tool_rounds < MAX_TOOL_ROUNDS:
                     pseudo_q = guard.query
-                    pseudo_id = f"call_pseudo_{round_idx}"
+                    pseudo_id = f"call_pseudo_{total_rounds}"
                     logger.warning(f"检测到文本形态的伪工具调用，已转为真实检索: {pseudo_q}")
                     yield f"data: {json.dumps({'type': 'tool_call', 'tool': 'web_search', 'query': pseudo_q}, ensure_ascii=False)}\n\n"
-                    pseudo_results = await web_search(pseudo_q)
+                    pseudo_results = _truncate_tool_result(await web_search(pseudo_q))
                     yield f"data: {json.dumps({'type': 'tool_result', 'tool': 'web_search', 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
                     api_messages.append({
                         "role": "assistant",
@@ -783,7 +879,8 @@ async def stream_ask_agnes(
                         }],
                     })
                     api_messages.append({"role": "tool", "tool_call_id": pseudo_id, "content": pseudo_results})
-                    round_idx += 1
+                    tool_rounds += 1
+                    total_rounds += 1
                     continue
 
                 # 本轮无工具调用 → 模型已完成本轮回答，agent loop 即将停止：
@@ -800,7 +897,7 @@ async def stream_ask_agnes(
                         api_messages.append({"role": "assistant", "content": round_content or None})
                         api_messages.append({"role": "user", "content":
                             "输出被长度限制截断。直接从中断处继续，不要道歉、不要复述已写内容，必要时拆成更短的段落。"})
-                        round_idx += 1
+                        total_rounds += 1
                         continue
                     if finish_reason == "length":
                         # 续写额度耗尽仍有截断：放行（内容已尽力补全），并在结尾告知用户
@@ -811,7 +908,7 @@ async def stream_ask_agnes(
                         "stop_hook_active": stop_hook_blocks > 0,  # 已拦截过则置位，防止 hook 无限打回
                         "message": message,
                         "reply": reply_acc,
-                        "tool_rounds": round_idx,
+                        "tool_rounds": tool_rounds,
                         "context": context,
                     }
                     decision = await _decide_stop(stop_hook, hook_payload)
@@ -824,7 +921,7 @@ async def stream_ask_agnes(
                         # 已流出的部分回答写入对话历史，再以 user 消息注入 hook 反馈，模型据此继续完善
                         api_messages.append({"role": "assistant", "content": reply_acc or None})
                         api_messages.append({"role": "user", "content": f"[stop_hook 反馈] {reason}"})
-                        round_idx += 1
+                        total_rounds += 1
                         continue
 
                     if decision.get("decision") == "block":
@@ -839,7 +936,7 @@ async def stream_ask_agnes(
                 tool_results = []
                 for idx in sorted(tool_calls_acc):
                     tc = tool_calls_acc[idx]
-                    tool_id = tc.get("id") or f"call_web_search_{round_idx}_{idx}"
+                    tool_id = tc.get("id") or f"call_web_search_{total_rounds}_{idx}"
                     tool_name = tc.get("name") or "web_search"
                     args_str = tc.get("arguments", "")
                     try:
@@ -850,8 +947,8 @@ async def stream_ask_agnes(
 
                     yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool_name, 'query': search_query}, ensure_ascii=False)}\n\n"
 
-                    # 服务端执行真实网页检索
-                    search_results = await web_search(search_query)
+                    # 服务端执行真实网页检索（结果按上限截断，防止撑爆上下文）
+                    search_results = _truncate_tool_result(await web_search(search_query))
 
                     yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool_name, 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
 
@@ -869,7 +966,8 @@ async def stream_ask_agnes(
                 })
                 api_messages.extend({"role": "tool", **res} for res in tool_results)
 
-                round_idx += 1
+                tool_rounds += 1
+                total_rounds += 1
 
             # 完成标识
             yield f"data: {json.dumps({'type': 'done', 'model': model, 'source': 'agnes-ai'}, ensure_ascii=False)}\n\n"

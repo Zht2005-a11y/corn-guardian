@@ -1354,6 +1354,9 @@ async function sendMessage() {
             toolStatus.value = evt.action === 'resume'
               ? '回答较长，正在继续生成...'
               : ''
+          } else if (evt.type === 'retry') {
+            // 上游请求抖动，后端正在指数退避重试（避免整段回答降级成离线模板）
+            toolStatus.value = `网络波动，正在重试（${evt.attempt}/${evt.max}）...`
           } else if (evt.type === 'stop_hook') {
             // Stop Hook（回合结束钩子）：block=回答被打回重答，allow=校验通过即将结束
             toolStatus.value = evt.action === 'block'

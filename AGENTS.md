@@ -93,9 +93,11 @@ run_frontend.bat   # Vite:    http://localhost:5173
 
 ## 关键架构知识（改问答逻辑前必读）
 
-- 工具循环上限 `MAX_TOOL_ROUNDS=6`；Stop Hook 拦截上限 `MAX_STOP_HOOK_BLOCKS=2`（见 `src/llm_client.py` 顶部注释）；
+- 三份额度彼此独立，**不要合并成一个计数器**：`MAX_TOOL_ROUNDS=6`（工具轮次，决定是否下发 tools）、`MAX_RESUME_ROUNDS=3`（截断续写）、`MAX_STOP_HOOK_BLOCKS=2`（打回重答），另有 `MAX_TOTAL_ROUNDS=12` 总闸（Claude Code maxTurns 语义）。历史上四者共用一个 `round_idx`，导致"截断 3 次 + 打回 2 次"就吃掉 6 次工具额度中的 5 次；
+- 上游请求带指数退避重试（`MAX_LLM_RETRIES=2`，`RETRYABLE_STATUS` 含 429/5xx），**仅在尚未向用户吐出内容时重试**——已流出文字再重试会重复输出；重试期间向前端推 `retry` 事件；
+- 工具结果按 `MAX_TOOL_RESULT_CHARS=8000` 截断（`_truncate_tool_result`），防止检索结果撑爆上下文；
 - Stop Hook 语义对齐 Claude Code hooks：`_decide_stop` 归一化返回值，block 时以 `[stop_hook 反馈]` 注入重答；
-- SSE 事件类型：`delta` / `tool_call` / `tool_result` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
+- SSE 事件类型：`delta` / `tool_call` / `tool_result` / `retry` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
 - 回答被 `max_tokens` 截断时会自动注入续写指令（`MAX_RESUME_ROUNDS=3` 次，对齐 Claude Code 的截断恢复），前端收到 `truncated` 事件显示"正在继续生成"；
 - 前端聊天的联网检索提示文案必须与 `web_search.py` 实际实现一致（当前为 360/搜狗/百度国内直连），不要写"知网"等不实来源。
 
