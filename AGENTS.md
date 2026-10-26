@@ -97,4 +97,11 @@ run_frontend.bat   # Vite:    http://localhost:5173
 - Stop Hook 语义对齐 Claude Code hooks：`_decide_stop` 归一化返回值，block 时以 `[stop_hook 反馈]` 注入重答；
 - SSE 事件类型：`delta` / `tool_call` / `tool_result` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
 - 回答被 `max_tokens` 截断时会自动注入续写指令（`MAX_RESUME_ROUNDS=3` 次，对齐 Claude Code 的截断恢复），前端收到 `truncated` 事件显示"正在继续生成"；
-- 前端聊天的联网检索提示文案与 `web_search.py` 实际实现（百度/搜狗抓取）需保持一致，不要写"知网"等不实来源。
+- 前端聊天的联网检索提示文案必须与 `web_search.py` 实际实现一致（当前为 360/搜狗/百度国内直连），不要写"知网"等不实来源。
+
+### 工具调用铁律（踩过坑，勿重犯）
+- **绝不按关键词门控 `tools` 数组**：工具列表必须每轮声明（对齐 Claude Code `query.ts:674`），是否调用由模型决定。曾用 `need_tools = any(k in message ...)` 决定是否下发工具，导致用户说"你先去查呀"时模型拿不到工具，只能把调用写成正文伪代码，出现"嘴上说检索、实际没检索"。
+- **用户明确要求检索时强制调用**：`wants_search()` 命中即首轮下发 `tool_choice={"type":"function","function":{"name":"web_search"}}`（等价 Claude Code `tool_choice:{type:'tool'}`）；网关不支持时自动降级为 `auto` 重试一次。
+- **伪工具调用必须拦截**：`PseudoToolCallGuard` 负责摘掉正文里的 `<web_search>…</web_search>` / `<tool_call>…</tool_call>` 等文本形态调用，抽出检索词转为**真实检索**再继续。新增工具时需同步扩充其 `OPENERS` / `CLOSERS`。
+- **禁止旁白**：提示词里明确禁止"好的，收到""我将为您检索"这类预告（对齐 Claude Code `prompts.ts:884` "Do not narrate what you're about to do — just do it"）。
+- **不要写"严禁调用工具"**：工具描述必须是"何时用/何时不用"的平衡写法；单方面压制会导致该查的时候也不查。

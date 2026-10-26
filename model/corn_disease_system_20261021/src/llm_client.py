@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+import re
 from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 import httpx
@@ -38,17 +39,23 @@ ROLE_INSTRUCTION = """你是国家大田数字农业应用创新基地与中国�
 你配备了通用的实时互联网检索工具 web_search。
 
 【核心专业领域与知识边界判定】:
-1. 专业领域核心知识（直接极速流式解答，严禁多余搜索）：你精通玉米大斑病、南方锈病、灰斑病及健康长势的病理特征、病斑诊断鉴别要点、致病菌特征、推荐杀菌剂化学防治处方（如苯醚甲环唑、戊唑醇、嘧菌酯等及科学轮换用药）、以及大田无人机飞防作业参数（高度、航速、喷液量、雾滴粒径）和大田微气候防治窗口期。对于这些玉米植保核心领域的咨询，你具备权威且充分的专业知识储备，必须直接流式给出结构清晰、权威专业的解答，严禁调用 web_search 造成延迟！
-2. 仅在明确外部未知与实时动态时调用 web_search：仅当用户提问明确涉及外部非玉米未知作物杂草、实时农产品粮油市场行情价格、或最新突发农业政策时事等外部事实时，才调用 web_search 进行联网检索。检索完成后直接输出对用户有价值的答案本身，严禁复述"该问题超出知识范围、需要调用工具检索"等过程性说明。回答中引用了联网检索到的外部事实时，必须在末尾列出「来源：」小节并附 markdown 链接。
-3. 回答排版规范：使用清晰自然的 Markdown 格式（适当加粗要点、小标题、分点条目），语言简练专业。"""
+1. 专业领域核心知识（直接作答）：你精通玉米大斑病、南方锈病、灰斑病及健康长势的病理特征、病斑诊断鉴别要点、致病菌特征、推荐杀菌剂化学防治处方（如苯醚甲环唑、戊唑醇、嘧菌酯等及科学轮换用药）、以及大田无人机飞防作业参数（高度、航速、喷液量、雾滴粒径）和大田微气候防治窗口期。对于这类稳定不变的病理与农艺知识，直接给出结构清晰、权威专业的解答即可，无需检索。
+2. 必须检索的情形（优先级高于上一条）：当用户明确要求「查一下 / 搜一下 / 联网 / 上网查 / 检索」时，或问题涉及具体年份与地区的实时行情价格、最新农业政策与新闻公告、当年发布的病虫害预报与防治指导意见时，必须先调用 web_search 拿到真实资料再作答。用户已经明确要求检索时，不得直接作答，也不得声称「我已检索」而未实际调用工具。
+3. 工具调用纪律：需要检索就直接调用工具，禁止输出任何文本形式的工具调用（如 <web_search>…</web_search>、<tool_call>…</tool_call>、query: xxx 这类伪代码），那会被判为无效输出。同时禁止旁白式预告（如「好的，收到」「我将为您检索」「正在搜索，请稍候」）——要么直接给答案，要么直接调用工具。
+4. 引用溯源：回答中引用了联网检索到的外部事实时，必须在末尾列出「来源：」小节并附 markdown 链接，严禁省略或编造链接。检索失败时如实说明「当前检索不可用」，不得凭旧记忆伪装成检索结果。
+5. 回答排版规范：使用清晰自然的 Markdown 格式（适当加粗要点、小标题、分点条目），语言简练专业。"""
 
 # web_search 工具规范声明
 WEB_SEARCH_TOOL = {
     "type": "function",
     "function": {
         "name": "web_search",
-        "description": "通用实时搜索引擎。注意：对于玉米大斑病、南方锈病、灰斑病、常见农药防治用药与无人机大田飞防作业参数，你已具备充分的专家知识，直接作答即可；仅当用户提问明确涉及外部未知杂草害虫、实时农产品市场价格或最新政策新闻时才调用此工具。"
-                       "检索结果中每条均带「来源」URL：回答涉及外部事实时，必须在回答末尾列出「来源：」小节并附 markdown 链接，严禁省略。"
+        "description": "联网检索实时互联网信息，返回带标题、摘要与来源 URL 的搜索结果。"
+                       "【何时必须调用】① 用户明确要求查一下/搜一下/联网/上网查/检索；"
+                       "② 询问实时农产品行情价格、粮价期货；③ 询问最新农业政策、补贴、公告、新闻；"
+                       "④ 询问当年或特定年份发布的病虫害预报、防治指导意见。以上情形必须先调用本工具再作答。"
+                       "【何时不必调用】玉米病害病理特征、农药用法用量、飞防作业参数等稳定农艺知识，直接作答即可。"
+                       "【输出要求】检索结果每条均带「来源」URL：回答引用外部事实时，必须在末尾列出「来源：」小节并附 markdown 链接，严禁省略或编造。"
                        "搜索词必须包含具体年份与地区（如「2026 山东 玉米 收购价」），不要用模糊的时间词。",
         "parameters": {
             "type": "object",
@@ -73,6 +80,126 @@ MAX_STOP_HOOK_BLOCKS = 2
 # 截断续写上限：回答被 max_tokens 截断（finish_reason=length）时，自动注入
 # 「从中断处继续」指令的最多次数（对齐 Claude Code 的 MAX_OUTPUT_TOKENS_RECOVERY_LIMIT）
 MAX_RESUME_ROUNDS = 3
+
+
+# 强制工具调用（对齐 Claude Code `tool_choice: {type:'tool', name:'web_search'}`，
+# 见 tools/WebSearchTool/WebSearchTool.ts:281）：用户明确要求检索时不允许模型拒绝调用
+FORCE_SEARCH_CHOICE = {"type": "function", "function": {"name": "web_search"}}
+
+# 用户显式要求联网检索的动作词（排除「检查/调查/审核」这类非检索语义的「查」）
+_SEARCH_INTENT_RE = re.compile(r"(?<![检调审核复抽])(查一?下|查查|查下|搜一?下|搜搜|去查|去搜|帮我查|帮我搜)|联网|上网|检索|搜索")
+# 强外部事实主题：命中即视为需要实时外部信息，首轮强制检索
+_EXTERNAL_TOPIC_KEYWORDS = ("价格", "行情", "收购", "粮价", "多少钱", "期货", "政策", "补贴", "新闻", "公告", "通报")
+
+
+def wants_search(message: str) -> bool:
+    """判断用户是否显式要求/隐含需要联网检索。
+
+    只用于「是否首轮强制调用工具」，不影响工具是否声明——工具始终声明，
+    最终调不调由模型决定（Claude Code 从不按关键词裁剪工具声明，见 query.ts:674）。
+    """
+    if not message:
+        return False
+    return bool(_SEARCH_INTENT_RE.search(message)) or any(k in message for k in _EXTERNAL_TOPIC_KEYWORDS)
+
+
+def _extract_pseudo_query(block: str) -> str:
+    """从文本形态的伪工具调用块里抽出检索词"""
+    text = re.sub(r"</?[^>]+>", " ", block or "")
+    m = re.search(r'["\']?query["\']?\s*[:=]\s*["\']?([^"\'\n}]+)', text, re.I)
+    if m and m.group(1).strip():
+        return m.group(1).strip()[:120]
+    for line in text.splitlines():
+        line = line.strip(" \t,;，；")
+        if len(line) >= 2:
+            return line[:120]
+    return ""
+
+
+class PseudoToolCallGuard:
+    """拦截正文里伪装成文本的工具调用，并回收其中的检索词。
+
+    背景：OpenAI 兼容网关降级、或模型拿不到原生 tools 声明时，模型会把工具调用
+    写成正文 `<web_search>query: xxx</web_search>`。这类文本会被原样流给用户，
+    变成"嘴上说检索、实际没检索"的假动作。本拦截器做三件事：
+      1. 流式安全：标记可能被拆进多个 delta，维护未决缓冲区，只有确认尾部不再是
+         标记前缀时才放行，避免把半个 `<web_search` 吐给用户；
+      2. 捕获：命中开标记后停止放行，直到闭合标记，抽出检索词存到 self.query；
+      3. 复用：调用方看到 self.query 非空，就把它当成一次真实工具调用来执行检索。
+    """
+
+    OPENERS = ("<web_search", "<tool_call", "<function_call", "<function=", "<invoke", "<antml:invoke")
+    CLOSERS = ("</web_search>", "</tool_call>", "</function_call>", "</invoke>", "</antml:invoke>")
+
+    def __init__(self) -> None:
+        self._buf = ""        # 未决缓冲区（可能构成标记前缀的尾部）
+        self._capture: Optional[str] = None  # 进入捕获模式后的原文
+        self.query: Optional[str] = None     # 捕获到的检索词；非 None 表示命中伪工具调用
+
+    def feed(self, piece: str) -> str:
+        """喂入一个流式分片，返回可立即安全推送的文本"""
+        if not piece:
+            return ""
+        self._buf += piece
+
+        if self._capture is not None:
+            self._capture += self._buf
+            self._buf = ""
+            return self._close_if_found()
+
+        low = self._buf.lower()
+        hit = -1
+        for marker in self.OPENERS:
+            i = low.find(marker)
+            if i != -1 and (hit == -1 or i < hit):
+                hit = i
+        if hit != -1:
+            safe = self._buf[:hit]
+            self._capture = self._buf[hit:]
+            self._buf = ""
+            return safe + self._close_if_found()
+
+        # 未命中标记：把可能是标记前缀的尾部留下，其余放行
+        keep = 0
+        low_tail = self._buf.lower()
+        for marker in self.OPENERS:
+            for k in range(min(len(marker) - 1, len(self._buf)), 0, -1):
+                if low_tail.endswith(marker[:k]):
+                    keep = max(keep, k)
+                    break
+        if keep:
+            safe, self._buf = self._buf[:-keep], self._buf[-keep:]
+            return safe
+        safe, self._buf = self._buf, ""
+        return safe
+
+    def _close_if_found(self) -> str:
+        """捕获模式下检查闭合标记；命中则解析检索词并把闭合后的内容重新走一遍 feed"""
+        assert self._capture is not None
+        low = self._capture.lower()
+        for closer in self.CLOSERS:
+            i = low.find(closer)
+            if i != -1:
+                block = self._capture[:i]
+                rest = self._capture[i + len(closer):]
+                self._capture = None
+                q = _extract_pseudo_query(block)
+                if q and not self.query:
+                    self.query = q
+                return self.feed(rest) if rest else ""
+        return ""
+
+    def flush(self) -> str:
+        """流结束时收尾：未闭合的捕获块也按伪调用处理，剩余缓冲一律放行"""
+        tail = self._buf
+        self._buf = ""
+        if self._capture is not None:
+            block, self._capture = self._capture, None
+            q = _extract_pseudo_query(block)
+            if q and not self.query:
+                self.query = q
+            return tail
+        return tail
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -383,7 +510,8 @@ async def ask_agnes(
         "temperature": temperature,
         "max_tokens": max_tokens,
         "tools": [WEB_SEARCH_TOOL],
-        "tool_choice": "auto",
+        # 用户明确要求检索时强制调用（与流式路径同一语义）
+        "tool_choice": FORCE_SEARCH_CHOICE if wants_search(message) else "auto",
     }
 
     try:
@@ -534,9 +662,12 @@ async def stream_ask_agnes(
     try:
         custom_timeout = httpx.Timeout(timeout=timeout, connect=8.0, read=timeout)
         async with httpx.AsyncClient(trust_env=False, timeout=custom_timeout) as client:
-            # 外部事实/行情才调用 web_search；玉米病害、飞防与农药领域知识直接高速流式作答
-            ext_keywords = ["价格", "收购", "多少钱", "政策", "补贴", "新闻", "行情", "今天", "最新", "品种", "除草剂"]
-            need_tools = any(k in message for k in ext_keywords)
+            # 工具始终声明（对齐 Claude Code query.ts:674：工具列表从不按关键词裁剪）。
+            # 关键词只决定「首轮是否强制调用」，不决定「工具是否存在」。
+            # 旧逻辑用关键词门控 tools 数组，导致用户说「你先去查呀」时模型压根没拿到
+            # 工具定义，只能把调用写成正文伪代码 —— 于是出现「嘴上说检索、实际没检索」。
+            force_search = wants_search(message)
+            force_downgraded = False  # 网关不支持强制 tool_choice 时降级标记
 
             # ── 工具循环：模型每轮请求工具 → 执行检索 → 回填结果继续，直到直接作答或达上限 ──
             round_idx = 0
@@ -551,18 +682,32 @@ async def stream_ask_agnes(
                     "max_tokens": max_tokens,
                     "stream": True,
                 }
-                # 尚有剩余工具轮次才放行工具；到达上限后收走工具，强制模型本轮直接作答
-                if need_tools and round_idx < MAX_TOOL_ROUNDS:
+                # 尚有剩余工具轮次就始终声明工具；到达上限后收走工具，强制模型本轮直接作答
+                if round_idx < MAX_TOOL_ROUNDS:
                     stream_payload["tools"] = [WEB_SEARCH_TOOL]
-                    stream_payload["tool_choice"] = "auto"
+                    # 用户明确要求检索 → 首轮强制调用，模型无权拒绝
+                    # （对齐 Claude Code tool_choice: {type:'tool', name:'web_search'}）
+                    stream_payload["tool_choice"] = (
+                        FORCE_SEARCH_CHOICE
+                        if (force_search and round_idx == 0 and not force_downgraded)
+                        else "auto"
+                    )
 
                 tool_calls_acc: Dict[int, Dict[str, Any]] = {}
                 is_tool = False
                 round_content = ""  # 累积本轮流式回答全文，供 Stop Hook 校验
                 finish_reason = None  # 本轮结束原因：None/stop/length/tool_calls
+                guard = PseudoToolCallGuard()  # 拦截正文里的伪工具调用
 
                 async with client.stream("POST", url, headers=headers, json=stream_payload) as stream_resp:
                     if stream_resp.status_code != 200:
+                        # 部分 OpenAI 兼容网关不支持强制 tool_choice，会直接 400/422：
+                        # 降级为 auto 重试一次，避免整轮掉进离线兜底
+                        if stream_resp.status_code in (400, 422) and not force_downgraded \
+                                and stream_payload.get("tool_choice") == FORCE_SEARCH_CHOICE:
+                            force_downgraded = True
+                            logger.warning("网关拒绝强制 tool_choice，降级为 auto 重试")
+                            continue
                         raise RuntimeError(f"Stream HTTP {stream_resp.status_code}")
 
                     async for line in stream_resp.aiter_lines():
@@ -598,13 +743,48 @@ async def stream_ask_agnes(
                                             tool_calls_acc[idx]["arguments"] += tc["function"]["arguments"]
                                     continue
 
-                                # 正常内容流式推送
+                                # 正常内容流式推送（先过伪工具调用拦截器）
                                 content_piece = delta.get("content", "")
                                 if content_piece:
-                                    round_content += content_piece
-                                    yield f"data: {json.dumps({'type': 'delta', 'content': content_piece}, ensure_ascii=False)}\n\n"
+                                    safe_piece = guard.feed(content_piece)
+                                    if safe_piece:
+                                        round_content += safe_piece
+                                        yield f"data: {json.dumps({'type': 'delta', 'content': safe_piece}, ensure_ascii=False)}\n\n"
                             except Exception:
                                 continue
+
+                    # 流结束：冲刷拦截器剩余文本（未闭合的伪工具调用块也在此被回收）
+                    tail_piece = guard.flush()
+                    if tail_piece:
+                        round_content += tail_piece
+                        yield f"data: {json.dumps({'type': 'delta', 'content': tail_piece}, ensure_ascii=False)}\n\n"
+
+                # ── 伪工具调用修复：模型把调用写成了正文而非原生 tool_calls ──
+                # 拦截器已把那段伪代码从用户可见文本中摘掉，这里补成一次真实检索，
+                # 让「说查却没查」变成「真的查了」。Claude Code 不需要这层兜底——它的上游
+                # 必定返回原生 tool_use 块；OpenAI 兼容网关降级/模型未拿到 tools 时才需要。
+                if guard.query and not (is_tool and tool_calls_acc) and round_idx < MAX_TOOL_ROUNDS:
+                    pseudo_q = guard.query
+                    pseudo_id = f"call_pseudo_{round_idx}"
+                    logger.warning(f"检测到文本形态的伪工具调用，已转为真实检索: {pseudo_q}")
+                    yield f"data: {json.dumps({'type': 'tool_call', 'tool': 'web_search', 'query': pseudo_q}, ensure_ascii=False)}\n\n"
+                    pseudo_results = await web_search(pseudo_q)
+                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': 'web_search', 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
+                    api_messages.append({
+                        "role": "assistant",
+                        "content": None,
+                        "tool_calls": [{
+                            "id": pseudo_id,
+                            "type": "function",
+                            "function": {
+                                "name": "web_search",
+                                "arguments": json.dumps({"query": pseudo_q}, ensure_ascii=False),
+                            },
+                        }],
+                    })
+                    api_messages.append({"role": "tool", "tool_call_id": pseudo_id, "content": pseudo_results})
+                    round_idx += 1
+                    continue
 
                 # 本轮无工具调用 → 模型已完成本轮回答，agent loop 即将停止：
                 # ① 若被 max_tokens 截断 → 注入续写指令继续生成（先于 Stop Hook）
