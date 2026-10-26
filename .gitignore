@@ -34,6 +34,11 @@ model/**/logs/
 dataset/
 *.zip
 
+# ===== 设计资产 =====
+# Figma 源文件与原始位图体积过大不入库（本地路径见 D:\Desktop\Tanee-Smart-Farming-UI-Kit）
+*.fig
+design/Tanee-Smart-Farming-UI-Kit/raw/
+
 # ===== 本地密钥与私有配置 =====
 # 真实 config.yaml 含 API Key，只保留模板文件
 .env

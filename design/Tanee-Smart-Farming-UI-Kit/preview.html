@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tanee — Smart Farming App UI Kit</title>
+<style>
+  :root {
+    --bg: #f4f4f4;
+    --card: #ffffff;
+    --text: #333333;
+    --muted: #a4a4a4;
+    --line: #ececec;
+    --green: #17b26a;
+    --brand: #35c56e;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 40px 32px 80px;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.6 "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  header { max-width: 1240px; margin: 0 auto 40px; }
+  h1 { margin: 0 0 8px; font-size: 32px; letter-spacing: -0.02em; }
+  .sub { margin: 0; color: var(--muted); }
+  .sub a { color: var(--green); text-decoration: none; }
+  .stats {
+    display: flex; flex-wrap: wrap; gap: 12px; margin-top: 24px;
+  }
+  .stat {
+    background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+    padding: 12px 18px; min-width: 120px;
+  }
+  .stat b { display: block; font-size: 22px; letter-spacing: -0.02em; }
+  .stat span { color: var(--muted); font-size: 12px; }
+  main { max-width: 1240px; margin: 0 auto; }
+  .grid {
+    display: grid; gap: 24px;
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  }
+  figure {
+    margin: 0; background: var(--card); border: 1px solid var(--line);
+    border-radius: 16px; overflow: hidden;
+    display: flex; flex-direction: column;
+  }
+  figure .thumb {
+    background: #eaeaea; overflow: hidden; aspect-ratio: 1194 / 834;
+  }
+  figure.cover .thumb { aspect-ratio: 16 / 9; }
+  figure img {
+    width: 100%; height: 100%; object-fit: cover; display: block;
+    transition: transform .35s ease;
+  }
+  figure:hover img { transform: scale(1.02); }
+  figcaption {
+    padding: 14px 18px 16px; border-top: 1px solid var(--line);
+  }
+  figcaption strong { display: block; font-size: 15px; }
+  figcaption em {
+    font-style: normal; color: var(--muted); font-size: 12px;
+  }
+  figcaption a { float: right; font-size: 12px; color: var(--green); text-decoration: none; }
+  h2 { font-size: 18px; margin: 48px 0 16px; letter-spacing: -0.01em; }
+  .files {
+    display: grid; gap: 16px;
+    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  }
+  .files a {
+    display: block; background: var(--card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 16px 18px; color: var(--text); text-decoration: none;
+  }
+  .files a:hover { border-color: var(--brand); }
+  .files b { display: block; }
+  .files span { color: var(--muted); font-size: 12px; }
+  .note {
+    margin-top: 40px; background: var(--card); border: 1px solid var(--line);
+    border-left: 3px solid var(--brand); border-radius: 12px; padding: 18px 22px;
+    color: #525866; font-size: 13px;
+  }
+  .note p { margin: 0 0 8px; }
+  .note p:last-child { margin: 0; }
+  footer {
+    max-width: 1240px; margin: 48px auto 0; color: var(--muted); font-size: 12px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Tanee — Smart Farming App UI Kit</h1>
+  <p class="sub">
+    免费版完整资源包 · 作者
+    <a href="https://www.nijaworks.com" target="_blank" rel="noopener">Nija Works</a>
+    · 来源
+    <a href="https://www.figma.com/community/file/1589911798189831497/freebie-tanee-smart-farming-app-ui-kit" target="_blank" rel="noopener">Figma Community</a>
+  </p>
+  <div class="stats">
+    <div class="stat"><b>5</b><span>应用界面</span></div>
+    <div class="stat"><b>65</b><span>SVG 图标</span></div>
+    <div class="stat"><b>12</b><span>原始位图</span></div>
+    <div class="stat"><b>1</b><span>.fig 源文件</span></div>
+    <div class="stat"><b>602</b><span>设计节点</span></div>
+    <div class="stat"><b>159</b><span>文字图层</span></div>
+    <div class="stat"><b>113</b><span>组件实例</span></div>
+  </div>
+</header>
+
+<main>
+  <h2>界面预览</h2>
+  <div class="grid">
+    <figure class="cover">
+      <div class="thumb"><img loading="lazy" src="png/00-Cover-Detail.jpg" alt="社区封面"></div>
+      <figcaption>
+        <strong>Cover</strong>
+        <em>1920 × 1080 · 社区封面</em>
+        <a href="png/00-Cover-Detail.jpg" target="_blank">原图</a>
+      </figcaption>
+    </figure>
+    <figure>
+      <div class="thumb"><img loading="lazy" src="png/01-Greenhouse-Monitoring-Dashboard.png" alt="温室监测仪表盘"></div>
+      <figcaption>
+        <strong>Greenhouse Monitoring Dashboard</strong>
+        <em>1194 × 834 · 温室监测仪表盘</em>
+        <a href="png/01-Greenhouse-Monitoring-Dashboard.png" target="_blank">原图</a>
+      </figcaption>
+    </figure>
+    <figure>
+      <div class="thumb"><img loading="lazy" src="png/02-Splash-Screen.png" alt="启动页"></div>
+      <figcaption>
+        <strong>Splash Screen</strong>
+        <em>1194 × 834 · 启动页</em>
+        <a href="png/02-Splash-Screen.png" target="_blank">原图</a>
+      </figcaption>
+    </figure>
+    <figure>
+      <div class="thumb"><img loading="lazy" src="png/03-Login-Empty.png" alt="登录页"></div>
+      <figcaption>
+        <strong>Login / Empty</strong>
+        <em>1194 × 834 · 登录页（空状态）</em>
+        <a href="png/03-Login-Empty.png" target="_blank">原图</a>
+      </figcaption>
+    </figure>
+    <figure>
+      <div class="thumb"><img loading="lazy" src="png/04-Forgot-Password-Empty.png" alt="找回密码页"></div>
+      <figcaption>
+        <strong>Forgot Password / Empty</strong>
+        <em>1194 × 834 · 找回密码页</em>
+        <a href="png/04-Forgot-Password-Empty.png" target="_blank">原图</a>
+      </figcaption>
+    </figure>
+    <figure>
+      <div class="thumb"><img loading="lazy" src="png/05-Signup-Empty.png" alt="注册页"></div>
+      <figcaption>
+        <strong>Sign up / Empty</strong>
+        <em>1194 × 834 · 注册页</em>
+        <a href="png/05-Signup-Empty.png" target="_blank">原图</a>
+      </figcaption>
+    </figure>
+  </div>
+
+  <h2>素材目录</h2>
+  <div class="files">
+    <a href="Tanee-Smart-Farming-UI-Kit.fig"><b>Tanee-Smart-Farming-UI-Kit.fig</b><span>可编辑源文件 · 50.6 MB · Figma 导入即可编辑</span></a>
+    <a href="svg/"><b>svg/</b><span>65 个矢量图标，按页面分目录</span></a>
+    <a href="raw/"><b>raw/</b><span>12 张原始位图（图片填充）</span></a>
+    <a href="json/design-page.json"><b>json/design-page.json</b><span>Design 页完整节点树 · 124,675 字符</span></a>
+    <a href="json/getting-started.json"><b>json/getting-started.json</b><span>Getting Started 页节点树 · 27,249 字符</span></a>
+    <a href="tokens/design-tokens.json"><b>tokens/design-tokens.json</b><span>颜色 / 字体 / 圆角 / 效果统计</span></a>
+    <a href="README.md"><b>README.md</b><span>完整说明：目录、键名表、授权</span></a>
+  </div>
+
+  <div class="note">
+    <p><strong>关于可编辑源文件：</strong>根目录的 <code>Tanee-Smart-Farming-UI-Kit.fig</code> 就是完整的可编辑源文件。Figma → 文件 → 导入（或直接拖进 Figma 窗口）即可打开。</p>
+    <p><strong>授权：</strong>允许个人/商业项目使用、修改、客户项目（署名可选）；禁止在其他平台转售或重新分发，禁止打包进付费 UI Kit / 素材市场。© 2025 Nija Works.</p>
+  </div>
+</main>
+
+<footer>
+  Preview generated locally · Tanee Smart Farming App UI Kit · free edition contains 5 screens
+</footer>
+
+</body>
+</html>
