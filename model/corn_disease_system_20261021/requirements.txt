@@ -31,3 +31,4 @@ pydantic>=2.5.0
 requests>=2.31.0
 httpx>=0.27.0
 pyyaml>=6.0
+ddgs>=0.9.0
