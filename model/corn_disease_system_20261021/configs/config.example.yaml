@@ -101,8 +101,8 @@ llm:
   temperature: 0.3
   max_tokens: 2048
 
-# 联网搜索（DDGS 元搜索，开源零 Key）
+# 联网搜索（360/搜狗/百度国内直连，零 Key 零代理；DDGS 可选需代理）
 search:
-  proxy: "http://127.0.0.1:7897"   # 境外引擎需走本地代理；留空 "" 直连；也可用环境变量 SEARCH_PROXY 覆盖
-  backends: ["bing", "google", "yahoo"]   # 降级链，中文农业内容 bing 召回最佳
+  backends: ["so360", "sogou", "baidu_mobile"]   # 降级链，可增删或调序；可选值见 src/web_search.py _ENGINES
+  proxy: ""   # 留空=纯国内直连；配置如 "http://127.0.0.1:7897" 后自动附加 DDGS 境外引擎
   max_results: 5

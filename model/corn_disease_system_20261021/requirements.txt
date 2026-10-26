@@ -31,4 +31,5 @@ pydantic>=2.5.0
 requests>=2.31.0
 httpx>=0.27.0
 pyyaml>=6.0
+# 可选依赖：联网搜索的境外 DDGS 引擎（仅当 config search.proxy 配置了代理才启用；主链路 360/搜狗/百度无需它）
 ddgs>=0.9.0
