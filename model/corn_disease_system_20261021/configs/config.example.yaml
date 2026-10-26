@@ -99,5 +99,5 @@ llm:
   model: "agnes-3.0-flash"
   timeout: 35.0
   temperature: 0.3
-  max_tokens: 1024
+  max_tokens: 2048
 

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from fastapi import APIRouter, File, HTTPException, Query, UploadFile
+from fastapi import APIRouter, File, HTTPException, Query, Request, UploadFile
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 from PIL import Image
@@ -438,10 +438,11 @@ async def chat_screen(req: ChatRequest):
 # 注意：已设 Cache-Control:no-cache / X-Accel-Buffering:no，Nginx 代理时需关闭缓冲
 # ---------------------------------------------------------------------------
 @router.post("/chat/stream")
-async def chat_screen_stream(req: ChatRequest):
+async def chat_screen_stream(req: ChatRequest, request: Request):
     """
     大田病害智能问答专家接口 (SSE 流式输出 + Web 联网搜索 Tool Call):
     结合 Agnes-3.0-Flash 原生 StreamingResponse，并在模型判定超出知识库时自动触发 web_search。
+    客户端断开（关面板/点停止/刷新页面）时立即终止生成，不再空耗 token。
     """
     msg = req.message.strip()
     if not msg:
@@ -456,23 +457,33 @@ async def chat_screen_stream(req: ChatRequest):
     timeout = float(llm_cfg.get("timeout", 45.0))
     temperature = float(llm_cfg.get("temperature", 0.3))
 
-    generator = stream_ask_agnes(
-        message=msg,
-        context=req.context,
-        history=req.history,
-        base_url=base_url,
-        api_key=api_key,
-        model=model,
-        timeout=timeout,
-        temperature=temperature,
-    )
+    async def _guarded_stream():
+        """断连守护：客户端断开即中止上游生成，防止无人观看时继续烧 token"""
+        generator = stream_ask_agnes(
+            message=msg,
+            context=req.context,
+            history=req.history,
+            base_url=base_url,
+            api_key=api_key,
+            model=model,
+            timeout=timeout,
+            temperature=temperature,
+        )
+        try:
+            async for chunk in generator:
+                if await request.is_disconnected():
+                    logger.info("[chat/stream] 客户端已断开，终止问答生成")
+                    break
+                yield chunk
+        finally:
+            await generator.aclose()
 
     headers = {
         "Cache-Control": "no-cache",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no",
     }
-    return StreamingResponse(generator, media_type="text/event-stream", headers=headers)
+    return StreamingResponse(_guarded_stream(), media_type="text/event-stream", headers=headers)
 
 
 # ==========================================================================

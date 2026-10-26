@@ -18,6 +18,7 @@ import asyncio
 import json
 import logging
 import os
+from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 import httpx
 
@@ -38,7 +39,7 @@ ROLE_INSTRUCTION = """你是国家大田数字农业应用创新基地与中国�
 
 【核心专业领域与知识边界判定】:
 1. 专业领域核心知识（直接极速流式解答，严禁多余搜索）：你精通玉米大斑病、南方锈病、灰斑病及健康长势的病理特征、病斑诊断鉴别要点、致病菌特征、推荐杀菌剂化学防治处方（如苯醚甲环唑、戊唑醇、嘧菌酯等及科学轮换用药）、以及大田无人机飞防作业参数（高度、航速、喷液量、雾滴粒径）和大田微气候防治窗口期。对于这些玉米植保核心领域的咨询，你具备权威且充分的专业知识储备，必须直接流式给出结构清晰、权威专业的解答，严禁调用 web_search 造成延迟！
-2. 仅在明确外部未知与实时动态时调用 web_search：仅当用户提问明确涉及外部非玉米未知作物杂草、实时农产品粮油市场行情价格、或最新突发农业政策时事等外部事实时，才调用 web_search 进行联网检索。检索完成后直接输出对用户有价值的答案本身，严禁复述"该问题超出知识范围、需要调用工具检索"等过程性说明。
+2. 仅在明确外部未知与实时动态时调用 web_search：仅当用户提问明确涉及外部非玉米未知作物杂草、实时农产品粮油市场行情价格、或最新突发农业政策时事等外部事实时，才调用 web_search 进行联网检索。检索完成后直接输出对用户有价值的答案本身，严禁复述"该问题超出知识范围、需要调用工具检索"等过程性说明。回答中引用了联网检索到的外部事实时，必须在末尾列出「来源：」小节并附 markdown 链接。
 3. 回答排版规范：使用清晰自然的 Markdown 格式（适当加粗要点、小标题、分点条目），语言简练专业。"""
 
 # web_search 工具规范声明
@@ -46,13 +47,15 @@ WEB_SEARCH_TOOL = {
     "type": "function",
     "function": {
         "name": "web_search",
-        "description": "通用实时搜索引擎。注意：对于玉米大斑病、南方锈病、灰斑病、常见农药防治用药与无人机大田飞防作业参数，你已具备充分的专家知识，直接作答即可；仅当用户提问明确涉及外部未知杂草害虫、实时农产品市场价格或最新政策新闻时才调用此工具。",
+        "description": "通用实时搜索引擎。注意：对于玉米大斑病、南方锈病、灰斑病、常见农药防治用药与无人机大田飞防作业参数，你已具备充分的专家知识，直接作答即可；仅当用户提问明确涉及外部未知杂草害虫、实时农产品市场价格或最新政策新闻时才调用此工具。"
+                       "检索结果中每条均带「来源」URL：回答涉及外部事实时，必须在回答末尾列出「来源：」小节并附 markdown 链接，严禁省略。"
+                       "搜索词必须包含具体年份与地区（如「2026 山东 玉米 收购价」），不要用模糊的时间词。",
         "parameters": {
             "type": "object",
             "properties": {
                 "query": {
                     "type": "string",
-                    "description": "提炼用户问题的核心搜索词",
+                    "description": "提炼用户问题的核心搜索词，须包含年份与地区",
                 }
             },
             "required": ["query"],
@@ -66,6 +69,10 @@ MAX_TOOL_ROUNDS = 6
 # Stop Hook 拦截上限：达到上限后强制放行结束，防止「打回重答」无限循环
 # （等价于 Claude Code hooks 中 stop_hook_active 标志的保护语义）
 MAX_STOP_HOOK_BLOCKS = 2
+
+# 截断续写上限：回答被 max_tokens 截断（finish_reason=length）时，自动注入
+# 「从中断处继续」指令的最多次数（对齐 Claude Code 的 MAX_OUTPUT_TOKENS_RECOVERY_LIMIT）
+MAX_RESUME_ROUNDS = 3
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -125,6 +132,41 @@ async def _decide_stop(
             return {"decision": "block", "reason": str(result.get("reason") or "回答未通过停止校验")}
         return {"decision": "allow"}
     return {"decision": "allow"}
+
+
+async def _resume_if_truncated_nonstream(
+    client: "httpx.AsyncClient",
+    url: str,
+    headers: Dict[str, str],
+    api_messages: List[Dict[str, Any]],
+    reply_text: str,
+    finish_reason: Optional[str],
+    *,
+    model: str,
+    temperature: float,
+    max_tokens: int,
+) -> str:
+    """非流式路径的截断恢复：finish_reason=length 时注入续写指令补全一次"""
+    if finish_reason != "length":
+        return reply_text
+    logger.info("非流式回答被 max_tokens 截断，注入续写指令补全一次")
+    api_messages.append({"role": "assistant", "content": reply_text})
+    api_messages.append({"role": "user", "content":
+        "输出被长度限制截断。直接从中断处继续，不要道歉、不要复述已写内容。"})
+    try:
+        resp = await client.post(url, headers=headers, json={
+            "model": model,
+            "messages": api_messages,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+        })
+        if resp.status_code == 200:
+            more = resp.json()["choices"][0]["message"]["content"]
+            if more:
+                return reply_text + more
+    except Exception as e:
+        logger.warning(f"续写请求失败，沿用原回答: {e}")
+    return reply_text
 
 
 async def _stop_hook_finalize_nonstream(
@@ -193,9 +235,35 @@ def build_context_block(context: Optional[Dict[str, Any]] = None) -> str:
     return "\n".join(ctx_lines)
 
 
+def build_env_block(context: Optional[Dict[str, Any]] = None) -> str:
+    """构建当前日期/农时/产区环境块，注入 system 提示词。
+
+    病害防治窗口期、用药时机高度依赖时令——模型必须知道「今天几号」才能给出
+    与季节匹配的建议（例如 10 月谈"抢在雨前施药"与 7 月完全不同）。
+    """
+    now = datetime.now()
+    month = now.month
+    if 4 <= month <= 5:
+        season = "春播与苗期管理期"
+    elif 6 <= month <= 9:
+        season = "夏玉米生长关键期（拔节-大喇叭口-灌浆）"
+    elif 10 <= month <= 11:
+        season = "秋收与冬小麦适期播种期"
+    else:
+        season = "冬闲与备耕期"
+    region = (context or {}).get("region") or "黄淮海夏玉米示范区"
+    return (
+        f"\n【当前环境信息】（由系统注入，供时令判断用）:\n"
+        f"• 今天日期: {now:%Y年%m月%d日}（第{now.isocalendar().week}周）\n"
+        f"• 农时阶段: {season}\n"
+        f"• 示范区域: {region}\n"
+        f"• 涉及实时行情、政策、病虫害动态时，搜索词必须带上 {now.year} 年与具体地区\n"
+    )
+
+
 def build_augmented_prompt(message: str, context: Optional[Dict[str, Any]] = None) -> str:
     """将专家设定、大田感知现场数据与当前用户提问融合为完整 Prompt"""
-    parts = [ROLE_INSTRUCTION]
+    parts = [ROLE_INSTRUCTION, build_env_block(context)]
 
     ctx_block = build_context_block(context)
     if ctx_block:
@@ -284,7 +352,7 @@ async def ask_agnes(
     model: str = DEFAULT_MODEL,
     timeout: float = DEFAULT_TIMEOUT,
     temperature: float = 0.3,
-    max_tokens: int = 1024,
+    max_tokens: int = 2048,
     stop_hook: Optional[Callable[[Dict[str, Any]], Any]] = None,
 ) -> Dict[str, Any]:
     """向 Agnes-3.0-Flash 大模型发起单次非流式请求（兼容旧接口）"""
@@ -351,7 +419,14 @@ async def ask_agnes(
                     })
                     if resp2.status_code == 200:
                         data2 = resp2.json()
-                        reply_text = data2["choices"][0]["message"]["content"]
+                        choice2 = data2["choices"][0]
+                        reply_text = choice2["message"]["content"]
+                        # 截断恢复：先补全，再过 Stop Hook
+                        reply_text = await _resume_if_truncated_nonstream(
+                            client, url, headers, api_messages, reply_text,
+                            choice2.get("finish_reason"),
+                            model=model, temperature=temperature, max_tokens=max_tokens,
+                        )
                         # Stop Hook：工具执行完毕、回合即将结束时校验最终回答
                         reply_text = await _stop_hook_finalize_nonstream(
                             client, url, headers, api_messages, reply_text,
@@ -367,6 +442,12 @@ async def ask_agnes(
                         }
 
                 reply = choice["message"]["content"]
+                # 截断恢复：先补全，再过 Stop Hook
+                reply = await _resume_if_truncated_nonstream(
+                    client, url, headers, api_messages, reply,
+                    choice.get("finish_reason"),
+                    model=model, temperature=temperature, max_tokens=max_tokens,
+                )
                 # Stop Hook：回合即将结束时校验最终回答
                 reply = await _stop_hook_finalize_nonstream(
                     client, url, headers, api_messages, reply,
@@ -409,7 +490,7 @@ async def stream_ask_agnes(
     model: str = DEFAULT_MODEL,
     timeout: float = DEFAULT_TIMEOUT,
     temperature: float = 0.3,
-    max_tokens: int = 1024,
+    max_tokens: int = 2048,
     stop_hook: Optional[Callable[[Dict[str, Any]], Any]] = None,
 ) -> AsyncGenerator[str, None]:
     """
@@ -426,7 +507,9 @@ async def stream_ask_agnes(
     """
     # ── 多轮 messages 组装：system 包装专家设定与感知上下文，history 保持原 role ──
     ctx_block = build_context_block(context)
-    system_content = f"{ROLE_INSTRUCTION}\n\n{ctx_block}" if ctx_block else ROLE_INSTRUCTION
+    system_content = f"{ROLE_INSTRUCTION}\n{build_env_block(context)}"
+    if ctx_block:
+        system_content = f"{system_content}\n{ctx_block}"
 
     api_messages: List[Dict[str, Any]] = [{"role": "system", "content": system_content}]
     if history:
@@ -458,6 +541,8 @@ async def stream_ask_agnes(
             # ── 工具循环：模型每轮请求工具 → 执行检索 → 回填结果继续，直到直接作答或达上限 ──
             round_idx = 0
             stop_hook_blocks = 0  # Stop Hook 已拦截次数（stop_hook_active 保护计数）
+            resume_count = 0      # 截断续写已用次数
+            reply_acc = ""        # 跨轮累积的完整回答（供 Stop Hook 校验全貌）
             while True:
                 stream_payload = {
                     "model": model,
@@ -474,6 +559,7 @@ async def stream_ask_agnes(
                 tool_calls_acc: Dict[int, Dict[str, Any]] = {}
                 is_tool = False
                 round_content = ""  # 累积本轮流式回答全文，供 Stop Hook 校验
+                finish_reason = None  # 本轮结束原因：None/stop/length/tool_calls
 
                 async with client.stream("POST", url, headers=headers, json=stream_payload) as stream_resp:
                     if stream_resp.status_code != 200:
@@ -490,6 +576,8 @@ async def stream_ask_agnes(
                                 if not choices:
                                     continue
                                 delta = choices[0].get("delta", {})
+                                if choices[0].get("finish_reason"):
+                                    finish_reason = choices[0]["finish_reason"]
 
                                 # 判定是否触发 tool_calls
                                 if "tool_calls" in delta and delta["tool_calls"]:
@@ -519,12 +607,30 @@ async def stream_ask_agnes(
                                 continue
 
                 # 本轮无工具调用 → 模型已完成本轮回答，agent loop 即将停止：
-                # 触发 Stop Hook（回合结束钩子）决定「放行结束」还是「携带反馈打回重答」
+                # ① 若被 max_tokens 截断 → 注入续写指令继续生成（先于 Stop Hook）
+                # ② 正常结束 → 触发 Stop Hook（回合结束钩子）决定「放行」还是「打回重答」
                 if not (is_tool and tool_calls_acc):
+                    reply_acc += round_content  # 累积跨轮全文（含续写片段），供 Stop Hook 校验
+
+                    # ── 截断恢复：对齐 Claude Code「Resume directly — no apology, no recap」──
+                    if finish_reason == "length" and resume_count < MAX_RESUME_ROUNDS:
+                        resume_count += 1
+                        logger.info(f"回答被 max_tokens 截断，注入续写指令继续生成(第{resume_count}/{MAX_RESUME_ROUNDS}次)")
+                        yield f"data: {json.dumps({'type': 'truncated', 'action': 'resume', 'round': resume_count}, ensure_ascii=False)}\n\n"
+                        api_messages.append({"role": "assistant", "content": round_content or None})
+                        api_messages.append({"role": "user", "content":
+                            "输出被长度限制截断。直接从中断处继续，不要道歉、不要复述已写内容，必要时拆成更短的段落。"})
+                        round_idx += 1
+                        continue
+                    if finish_reason == "length":
+                        # 续写额度耗尽仍有截断：放行（内容已尽力补全），并在结尾告知用户
+                        logger.warning(f"截断续写已达上限({MAX_RESUME_ROUNDS}次)，回答仍被截断，强制放行")
+                        yield f"data: {json.dumps({'type': 'truncated', 'action': 'incomplete'}, ensure_ascii=False)}\n\n"
+
                     hook_payload = {
                         "stop_hook_active": stop_hook_blocks > 0,  # 已拦截过则置位，防止 hook 无限打回
                         "message": message,
-                        "reply": round_content,
+                        "reply": reply_acc,
                         "tool_rounds": round_idx,
                         "context": context,
                     }
@@ -536,7 +642,7 @@ async def stream_ask_agnes(
                         logger.info(f"Stop Hook 拦截本轮结束(第{stop_hook_blocks}/{MAX_STOP_HOOK_BLOCKS}次): {reason}")
                         yield f"data: {json.dumps({'type': 'stop_hook', 'action': 'block', 'reason': reason}, ensure_ascii=False)}\n\n"
                         # 已流出的部分回答写入对话历史，再以 user 消息注入 hook 反馈，模型据此继续完善
-                        api_messages.append({"role": "assistant", "content": round_content or None})
+                        api_messages.append({"role": "assistant", "content": reply_acc or None})
                         api_messages.append({"role": "user", "content": f"[stop_hook 反馈] {reason}"})
                         round_idx += 1
                         continue
