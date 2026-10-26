@@ -1280,6 +1280,13 @@ const fastQuestions = [
   '如何调配无人机变量施药处方？'
 ]
 
+// 会话标识：一次页面会话固定一个，用于中途打断后说「继续」时让后端恢复原任务
+const chatSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+
+// 当前请求的中断控制器。必须放模块级——stopChat() 需要访问它
+// （此前声明在 sendMessage 内部，导致点「停止」时抛 ReferenceError）
+let chatAbort = null
+
 async function sendMessage() {
   const query = inputText.value.trim()
   if (!query || aiTyping.value) return
@@ -1302,7 +1309,7 @@ async function sendMessage() {
   }
 
   let hasAiMsg = false
-  let chatAbort = null
+  chatAbort = null
 
   try {
     // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
@@ -1314,6 +1321,8 @@ async function sendMessage() {
       body: JSON.stringify({
         message: query,
         history,
+        // 会话标识：后端据此缓存被打断那一轮的完整上下文（含检索结果）
+        session_id: chatSessionId,
         // 当前诊断上下文（字段与后端 build_context_block 对齐；undefined 字段 JSON 序列化时自动省略）
         context: isDetected.value ? {
           diseaseName: currentSample.value?.diseaseName || '玉米灰斑病',
@@ -1354,6 +1363,9 @@ async function sendMessage() {
             toolStatus.value = evt.action === 'resume'
               ? '回答较长，正在继续生成...'
               : ''
+          } else if (evt.type === 'resume') {
+            // 后端命中会话快照，正在接着上次被打断的任务继续（含此前已检索到的结果）
+            toolStatus.value = '已恢复上次中断的任务，正在继续处理...'
           } else if (evt.type === 'retry') {
             // 上游请求抖动，后端正在指数退避重试（避免整段回答降级成离线模板）
             toolStatus.value = `网络波动，正在重试（${evt.attempt}/${evt.max}）...`

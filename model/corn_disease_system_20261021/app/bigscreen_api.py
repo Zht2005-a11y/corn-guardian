@@ -377,6 +377,7 @@ class ChatRequest(BaseModel):
     message: str = Field(..., description="用户咨询问题")
     context: Optional[Dict[str, Any]] = Field(None, description="当前诊断上下文")
     history: Optional[List[Dict[str, Any]]] = Field(None, description="历史对话上下文")
+    session_id: Optional[str] = Field(None, description="会话标识：用于中途打断后「继续」时恢复任务")
 
 
 # ---------------------------------------------------------------------------
@@ -468,6 +469,7 @@ async def chat_screen_stream(req: ChatRequest, request: Request):
             model=model,
             timeout=timeout,
             temperature=temperature,
+            session_id=req.session_id,
         )
         try:
             async for chunk in generator:

@@ -20,6 +20,7 @@ import logging
 import os
 import random
 import re
+import time
 from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 import httpx
@@ -261,6 +262,69 @@ class PseudoToolCallGuard:
                 self.query = q
             return tail
         return tail
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 会话快照：支持「中途打断后说继续」时接着原任务干
+# 问题：api_messages 是生成器局部变量，用户点停止 → aclose() → 连同已拿到的检索
+# 结果一起销毁；前端 history 只有文字、拿不到 tool 消息。于是「继续」只能接着写
+# 半截句子，接不上「已经查过什么、查到了什么」。
+# 方案：按 session_id 缓存完整 messages（含 tool 消息与半截回答），TTL 5 分钟。
+# 语义对齐 Claude Code：它的 messages 是会话级持久状态，打断只是停流，上下文不丢。
+# ─────────────────────────────────────────────────────────────────────────────
+SESSION_TTL_SECONDS = 300
+MAX_SESSIONS = 50
+_SESSIONS: Dict[str, Dict[str, Any]] = {}
+
+# 「继续」类短指令：命中且消息很短时才走快照恢复，避免把「继续使用苯醚甲环唑…」误判
+_CONTINUE_RE = re.compile(r"^(继续|接着|往下|然后呢|接着说|继续说|再往下|go on|continue)", re.I)
+
+
+def wants_continue(message: str) -> bool:
+    """是否是「继续上次被打断的任务」这类短指令"""
+    text = (message or "").strip()
+    return len(text) <= 12 and bool(_CONTINUE_RE.match(text))
+
+
+def _prune_sessions(now: Optional[float] = None) -> None:
+    """清理过期会话；超过上限时淘汰最旧的一条"""
+    now = now if now is not None else time.time()
+    for key in [k for k, v in _SESSIONS.items() if now - v["ts"] > SESSION_TTL_SECONDS]:
+        _SESSIONS.pop(key, None)
+    while len(_SESSIONS) > MAX_SESSIONS:
+        oldest = min(_SESSIONS, key=lambda k: _SESSIONS[k]["ts"])
+        _SESSIONS.pop(oldest, None)
+
+
+def save_session(session_id: Optional[str], messages: List[Dict[str, Any]], reply: str = "") -> None:
+    """保存本轮会话快照（含工具结果与已流出的半截回答）"""
+    if not session_id:
+        return
+    snapshot = [dict(m) for m in messages]
+    # 半截回答必须进快照，否则恢复后模型会从头重写而不是接着写
+    if reply and (not snapshot or snapshot[-1].get("role") != "assistant"):
+        snapshot.append({"role": "assistant", "content": reply})
+    _SESSIONS[session_id] = {"messages": snapshot, "reply": reply, "ts": time.time()}
+    # 先写入再清理：这样新条目（最新 ts）不会被自己淘汰掉，且总容量严格不超上限
+    _prune_sessions()
+
+
+def load_session(session_id: Optional[str]) -> Optional[List[Dict[str, Any]]]:
+    """取回会话快照（过期或不存在返回 None），命中即续期"""
+    if not session_id:
+        return None
+    _prune_sessions()
+    entry = _SESSIONS.get(session_id)
+    if not entry:
+        return None
+    entry["ts"] = time.time()
+    return [dict(m) for m in entry["messages"]]
+
+
+def clear_session(session_id: Optional[str]) -> None:
+    """主动丢弃会话快照"""
+    if session_id:
+        _SESSIONS.pop(session_id, None)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -681,6 +745,7 @@ async def stream_ask_agnes(
     temperature: float = 0.3,
     max_tokens: int = 2048,
     stop_hook: Optional[Callable[[Dict[str, Any]], Any]] = None,
+    session_id: Optional[str] = None,
 ) -> AsyncGenerator[str, None]:
     """
     极速流畅流式响应 (Fast & Smooth SSE Stream)：
@@ -712,7 +777,24 @@ async def stream_ask_agnes(
             elif role in ("ai", "assistant"):
                 api_messages.append({"role": "assistant", "content": text})
 
+    # ── 会话恢复：用户说「继续」且命中快照 → 直接在原 messages 上续跑 ──
+    # 快照里含已执行的 tool 消息（检索结果）与已流出的半截回答，因此能真正「接着干」，
+    # 而不是靠前端 history 里的纯文字重建（那样检索结果必然丢失）。
+    resumed_from_cache = False
+    if session_id and wants_continue(message):
+        cached = load_session(session_id)
+        if cached:
+            api_messages = cached
+            resumed_from_cache = True
+            logger.info(f"命中会话快照，恢复被打断的任务: session={session_id} 消息数={len(cached)}")
+
     api_messages.append({"role": "user", "content": message})
+
+    if resumed_from_cache:
+        yield f"data: {json.dumps({'type': 'resume', 'action': 'restored', 'messages': len(api_messages)}, ensure_ascii=False)}\n\n"
+
+    reply_acc = ""  # 提前初始化：保证 finally 里保存快照时一定存在
+    round_content = ""  # 同上：被中断时用它兜住当前轮的半截回答
 
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
@@ -865,7 +947,7 @@ async def stream_ask_agnes(
                     logger.warning(f"检测到文本形态的伪工具调用，已转为真实检索: {pseudo_q}")
                     yield f"data: {json.dumps({'type': 'tool_call', 'tool': 'web_search', 'query': pseudo_q}, ensure_ascii=False)}\n\n"
                     pseudo_results = _truncate_tool_result(await web_search(pseudo_q))
-                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': 'web_search', 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
+                    # 先落库再通知前端：断在此处也不会丢检索结果
                     api_messages.append({
                         "role": "assistant",
                         "content": None,
@@ -879,6 +961,7 @@ async def stream_ask_agnes(
                         }],
                     })
                     api_messages.append({"role": "tool", "tool_call_id": pseudo_id, "content": pseudo_results})
+                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': 'web_search', 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
                     tool_rounds += 1
                     total_rounds += 1
                     continue
@@ -931,9 +1014,11 @@ async def stream_ask_agnes(
                     yield f"data: {json.dumps({'type': 'stop_hook', 'action': 'allow'}, ensure_ascii=False)}\n\n"
                     break
 
-                # 执行本轮全部工具调用：一条 assistant 消息携带所有 tool_calls，再逐条回填 tool 结果
+                # 执行本轮全部工具调用：一条 assistant 消息携带所有 tool_calls，再逐条回填 tool 结果。
+                # 顺序很重要：先把 tool_calls 消息落库、检索完成后立刻回填 tool 消息，最后才 yield
+                # 通知前端——这样即使在 tool_result 处被用户打断，会话快照里也已经含有检索结果。
                 assistant_tool_calls = []
-                tool_results = []
+                pending_calls = []
                 for idx in sorted(tool_calls_acc):
                     tc = tool_calls_acc[idx]
                     tool_id = tc.get("id") or f"call_web_search_{total_rounds}_{idx}"
@@ -944,27 +1029,29 @@ async def stream_ask_agnes(
                     except Exception:
                         fn_args = {"query": message}
                     search_query = fn_args.get("query", message)
-
-                    yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool_name, 'query': search_query}, ensure_ascii=False)}\n\n"
-
-                    # 服务端执行真实网页检索（结果按上限截断，防止撑爆上下文）
-                    search_results = _truncate_tool_result(await web_search(search_query))
-
-                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool_name, 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
-
                     assistant_tool_calls.append({
                         "id": tool_id,
                         "type": "function",
                         "function": {"name": tool_name, "arguments": args_str or json.dumps({"query": search_query})},
                     })
-                    tool_results.append({"tool_call_id": tool_id, "content": search_results})
+                    pending_calls.append((tool_id, tool_name, search_query))
 
                 api_messages.append({
                     "role": "assistant",
                     "content": None,
                     "tool_calls": assistant_tool_calls,
                 })
-                api_messages.extend({"role": "tool", **res} for res in tool_results)
+
+                for tool_id, tool_name, search_query in pending_calls:
+                    yield f"data: {json.dumps({'type': 'tool_call', 'tool': tool_name, 'query': search_query}, ensure_ascii=False)}\n\n"
+
+                    # 服务端执行真实网页检索（结果按上限截断，防止撑爆上下文）
+                    search_results = _truncate_tool_result(await web_search(search_query))
+
+                    # 先落库再通知：断在此处也不会丢结果
+                    api_messages.append({"role": "tool", "tool_call_id": tool_id, "content": search_results})
+
+                    yield f"data: {json.dumps({'type': 'tool_result', 'tool': tool_name, 'message': '检索完成，大模型正在组织回答...'}, ensure_ascii=False)}\n\n"
 
                 tool_rounds += 1
                 total_rounds += 1
@@ -982,3 +1069,11 @@ async def stream_ask_agnes(
             yield f"data: {json.dumps({'type': 'delta', 'content': piece}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.02)
         yield f"data: {json.dumps({'type': 'done', 'model': model, 'source': 'fallback'}, ensure_ascii=False)}\n\n"
+
+    finally:
+        # 无论正常结束、异常还是被用户打断（aclose 触发的 GeneratorExit），都保存快照，
+        # 供下一轮「继续」时恢复。注意：此处不能 yield，生成器正在关闭。
+        try:
+            save_session(session_id, api_messages, reply_acc or round_content)
+        except Exception as exc:  # 快照失败绝不能影响主流程
+            logger.debug(f"保存会话快照失败: {exc}")

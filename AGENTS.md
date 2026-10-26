@@ -97,7 +97,9 @@ run_frontend.bat   # Vite:    http://localhost:5173
 - 上游请求带指数退避重试（`MAX_LLM_RETRIES=2`，`RETRYABLE_STATUS` 含 429/5xx），**仅在尚未向用户吐出内容时重试**——已流出文字再重试会重复输出；重试期间向前端推 `retry` 事件；
 - 工具结果按 `MAX_TOOL_RESULT_CHARS=8000` 截断（`_truncate_tool_result`），防止检索结果撑爆上下文；
 - Stop Hook 语义对齐 Claude Code hooks：`_decide_stop` 归一化返回值，block 时以 `[stop_hook 反馈]` 注入重答；
-- SSE 事件类型：`delta` / `tool_call` / `tool_result` / `retry` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
+- SSE 事件类型：`delta` / `tool_call` / `tool_result` / `retry` / `resume` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
+- **会话快照（打断后可继续）**：`api_messages` 是生成器局部变量，用户点停止即销毁。`llm_client.py` 按 `session_id` 缓存完整 messages（含 tool 消息与半截回答），TTL 300s、上限 50 条、命中即续期；用户说「继续」且命中快照时直接在原 messages 上续跑（`wants_continue()` 限定 ≤12 字，避免误判）。快照在生成器 `finally` 中保存，`aclose()` 触发的 GeneratorExit 同样会走 `finally`；
+- **工具结果必须先落库再 yield**：检索完成后立即 `api_messages.append({"role": "tool", ...})`，之后才推 `tool_result` 事件。否则用户恰好在通知那一刻打断，快照里就没有检索结果，「继续」时只能重查。
 - 回答被 `max_tokens` 截断时会自动注入续写指令（`MAX_RESUME_ROUNDS=3` 次，对齐 Claude Code 的截断恢复），前端收到 `truncated` 事件显示"正在继续生成"；
 - 前端聊天的联网检索提示文案必须与 `web_search.py` 实际实现一致（当前为 360/搜狗/百度国内直连），不要写"知网"等不实来源。
 
