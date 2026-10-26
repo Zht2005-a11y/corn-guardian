@@ -95,5 +95,6 @@ run_frontend.bat   # Vite:    http://localhost:5173
 
 - 工具循环上限 `MAX_TOOL_ROUNDS=6`；Stop Hook 拦截上限 `MAX_STOP_HOOK_BLOCKS=2`（见 `src/llm_client.py` 顶部注释）；
 - Stop Hook 语义对齐 Claude Code hooks：`_decide_stop` 归一化返回值，block 时以 `[stop_hook 反馈]` 注入重答；
-- SSE 事件类型：`delta` / `tool_call` / `tool_result` / `stop_hook` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
+- SSE 事件类型：`delta` / `tool_call` / `tool_result` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
+- 回答被 `max_tokens` 截断时会自动注入续写指令（`MAX_RESUME_ROUNDS=3` 次，对齐 Claude Code 的截断恢复），前端收到 `truncated` 事件显示"正在继续生成"；
 - 前端聊天的联网检索提示文案与 `web_search.py` 实际实现（百度/搜狗抓取）需保持一致，不要写"知网"等不实来源。

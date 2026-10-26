@@ -729,7 +729,7 @@
                   class="di-msg-bubble"
                   :class="{ streaming: msg.role === 'ai' && aiTyping && i === messages.length - 1 }"
                 >
-                  <div v-if="msg.searchQuery" class="di-search-tag">🔍 已检索知网植保库: {{ msg.searchQuery }}</div>
+                  <div v-if="msg.searchQuery" class="di-search-tag">🔍 已联网检索: {{ msg.searchQuery }}</div>
                   <div v-if="msg.role === 'user'" class="msg-plain">{{ msg.text }}</div>
                   <div v-else class="msg-md" v-html="renderMsg(msg)"></div>
                 </div>
@@ -764,7 +764,9 @@
                 placeholder="询问对症药剂、气象抑制阈值或无人机施药参数..."
                 class="di-input"
               />
-              <button class="di-send-btn" @click="sendMessage" :disabled="aiTyping">发送</button>
+              <button class="di-send-btn" @click="aiTyping ? stopChat() : sendMessage()">
+                {{ aiTyping ? '停止' : '发送' }}
+              </button>
             </div>
           </div>
         </div>
@@ -1300,11 +1302,15 @@ async function sendMessage() {
   }
 
   let hasAiMsg = false
+  let chatAbort = null
 
   try {
+    // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
+    chatAbort = new AbortController()
     const response = await fetch('/api/screen/chat/stream', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: chatAbort.signal,
       body: JSON.stringify({
         message: query,
         history,
@@ -1343,6 +1349,11 @@ async function sendMessage() {
           const evt = JSON.parse(jsonStr)
           if (evt.type === 'tool_call') {
             toolStatus.value = `正在联网检索：「${evt.query}」...`
+          } else if (evt.type === 'truncated') {
+            // 回答被 max_tokens 截断：resume=后端正在续写，incomplete=续写额度用尽
+            toolStatus.value = evt.action === 'resume'
+              ? '回答较长，正在继续生成...'
+              : ''
           } else if (evt.type === 'stop_hook') {
             // Stop Hook（回合结束钩子）：block=回答被打回重答，allow=校验通过即将结束
             toolStatus.value = evt.action === 'block'
@@ -1371,15 +1382,33 @@ async function sendMessage() {
       }
     }
   } catch (err) {
-    console.error('流式问答失败:', err)
-    if (!hasAiMsg) {
-      messages.value.push({
-        role: 'ai',
-        text: '⚠️ 问答服务响应超时，建议参考嘧菌酯对路药剂并严控田间湿度。'
-      })
+    if (err?.name === 'AbortError') {
+      // 用户主动停止：在已有回答后追加标记，避免误以为是异常
+      if (hasAiMsg) {
+        messages.value[messages.value.length - 1].text += '\n\n⏹ 已停止生成'
+      } else {
+        messages.value.push({ role: 'ai', text: '⏹ 已停止生成。' })
+      }
+    } else {
+      console.error('流式问答失败:', err)
+      if (!hasAiMsg) {
+        messages.value.push({
+          role: 'ai',
+          text: '⚠️ 问答服务响应超时，建议参考嘧菌酯对路药剂并严控田间湿度。'
+        })
+      }
     }
   } finally {
     aiTyping.value = false
+    chatAbort = null
+  }
+}
+
+// 手动停止当前生成（发送按钮在 aiTyping 时变为「停止」）
+function stopChat() {
+  if (chatAbort) {
+    chatAbort.abort()
+    toolStatus.value = ''
   }
 }
 
