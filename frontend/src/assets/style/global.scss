@@ -1,0 +1,52 @@
+/* ==========================================================================
+   Tanee Smart Farming App UI Kit - Design System (1:1 High Fidelity)
+   Source: Figma Community by Nija Works
+   ========================================================================== */
+
+:root {
+  --bg: #dcdcdc;
+  --card-bg: #ececec;
+  --card-subtle: #f4f4f4;
+  --text: #333333;
+  --text-muted: #a4a4a4;
+  --text-secondary: #525866;
+  --line: #ececec;
+  --line-strong: #dcdcdc;
+  
+  --green: #17b26a;
+  --brand-gradient: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+  --dark-gradient: linear-gradient(135deg, #666666 0%, #1a1a1a 100%);
+  --warn-gradient: linear-gradient(135deg, #f9ad19 0%, #e39704 100%);
+  
+  --font-family: 'Satoshi', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--bg);
+  color: var(--text);
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #c8c8c8;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a4a4a4;
+}

@@ -1,0 +1,49 @@
+# ===== Python =====
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+
+# ===== 前端 =====
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# 模板遗留的原始设计图（约 85MB，代码零引用，仅本地保留）
+# 注意：public/tanee/raw/dashboard/ 被大屏演示图使用，必须保留
+frontend/src/assets/tanee/raw/
+frontend/public/tanee/raw/login/
+frontend/public/tanee/raw/signup/
+frontend/public/tanee/raw/forgot/
+frontend/public/tanee/raw/cover/
+
+# ===== 模型权重（体积大，不入库）=====
+*.pth
+*.pt
+*.onnx
+*.ckpt
+*.safetensors
+model/**/outputs/
+model/**/runs/
+model/**/logs/
+
+# ===== 数据集（约 191MB，不入库）=====
+dataset/
+*.zip
+
+# ===== 本地密钥与私有配置 =====
+# 真实 config.yaml 含 API Key，只保留模板文件
+.env
+.env.*
+model/corn_disease_system_20261021/configs/config.yaml
+!model/corn_disease_system_20261021/configs/config.example.yaml
+
+# ===== IDE / 工具缓存 =====
+.idea/
+.vscode/
+.workbuddy-ai/
+tmp_edge/
+*.log

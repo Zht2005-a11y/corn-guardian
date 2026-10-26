@@ -1,0 +1,331 @@
+Greenhouse Monitoring Dashboard (FRAME) [1194x834] @(5074,400) f:[{"t":"SOLID","c":[220,220,220,1]}]
+  Sidebar (INSTANCE) [103x834] @(0,0)
+    Brand (FRAME) [103x78] @(0,0)
+      Logo (INSTANCE) [46x46] @(29,16) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}] r:99999
+        Union (VECTOR) [22x22] @(12,12) f:[{"t":"SOLID","c":[255,255,255,1]}]
+    Menu container (FRAME) [103x600] @(0,78)
+      Nav list (INSTANCE) [60x60] @(22,174) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[102,102,102,1]],[1,[26,26,26,1]]],"gt":[[0.48523,0.62062,-0.05293],[-0.62062,0.48523,0.56769]]}] r:8
+        Home Filled (INSTANCE) [20x20] @(20,20) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [20x20] @(0,0)
+          Vector (VECTOR) [14x14] @(3,3) f:[{"t":"SOLID","c":[255,255,255,1]}]
+      Nav list (INSTANCE) [60x60] @(22,238) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+        ComputerTower (INSTANCE) [20x20] @(20,20) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [13x16] @(4,2) f:[{"t":"SOLID","c":[51,51,51,1]}]
+      Nav list (INSTANCE) [60x60] @(22,302) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+        ChartPie (INSTANCE) [20x20] @(20,20) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [16x16] @(2,2) f:[{"t":"SOLID","c":[51,51,51,1]}]
+      Nav list (INSTANCE) [60x60] @(22,366) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+        MapTrifold (INSTANCE) [20x20] @(20,20) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [16x15] @(2,3) f:[{"t":"SOLID","c":[51,51,51,1]}]
+    Menu container (FRAME) [103x156] @(0,678)
+      Nav list (INSTANCE) [60x60] @(22,16) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+        GearSix (INSTANCE) [20x20] @(20,20) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [18x16] @(1,2) f:[{"t":"SOLID","c":[51,51,51,1]}]
+      Nav list (INSTANCE) [60x60] @(22,80) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+        User (INSTANCE) [20x20] @(20,20) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [16x16] @(2,2) f:[{"t":"SOLID","c":[51,51,51,1]}]
+  Body (FRAME) [1091x834] @(103,0)
+    Header (INSTANCE) [1091x76] @(0,0)
+      Text (TEXT) [732x34] @(16,21) tx:"Greenhouse Monitoring" f:[{"t":"SOLID","c":[51,51,51,1]}]
+      Alerts Button (FRAME) [110x32] @(764,22) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[102,102,102,1]],[1,[26,26,26,1]]],"gt":[[0.48523,0.62062,-0.05293],[-0.62062,0.48523,0.56769]]}] r:8
+        Notif Button (FRAME) [32x32] @(0,0) f:[{"t":"SOLID","o":0.16,"c":[255,255,255,1]}] r:8
+          Bell (INSTANCE) [16x16] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+            Vector (VECTOR) [12x13] @(2,2) f:[{"t":"SOLID","c":[255,255,255,1]}]
+        3 Alert (TEXT) [34x19] @(40,7) tx:"3 Alert" f:[{"t":"SOLID","c":[255,255,255,1]}]
+        ArrowUpRight (INSTANCE) [16x16] @(82,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+          Vector (VECTOR) [9x9] @(4,4) f:[{"t":"SOLID","c":[255,255,255,1]}]
+      Sector Selector (FRAME) [185x31] @(890,23)
+        Sector: (TEXT) [38x19] @(0,6) tx:"Sector:" f:[{"t":"SOLID","c":[51,51,51,1]}]
+        Button (INSTANCE) [139x31] @(46,0) f:[{"t":"SOLID","c":[234,234,234,1]}] r:8
+          Button (TEXT) [103x19] @(6,6) tx:"Spinach Garden 08" f:[{"t":"SOLID","c":[51,51,51,1]}]
+          CaretDown (INSTANCE) [16x16] @(117,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+            Vector (VECTOR) [11x6] @(3,6) f:[{"t":"SOLID","c":[51,51,51,1]}]
+    Main Content (FRAME) [1091x758] @(0,76)
+      Container (FRAME) [526x726] @(16,16)
+        Card (FRAME) [526x344] @(0,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+          Map (FRAME) [302x359] @(224,0) f:[{"t":"SOLID","c":[244,244,244,1]}]
+            Plot Boundary (VECTOR) [230x210] @(116,183) f:[{"t":"SOLID","c":[235,235,235,1]}] r:2
+            Plot Boundary (VECTOR) [95x148] @(103,71) f:[{"t":"SOLID","c":[235,235,235,1]}] r:2
+            Plot Boundary (VECTOR) [127x135] @(187,60) f:[{"t":"SOLID","c":[235,235,235,1]}] r:2
+            Plot Boundary (VECTOR) [109x125] @(0,149) f:[{"t":"SOLID","c":[235,235,235,1]}] r:2
+            Plot Boundary (VECTOR) [246x128] @(3,269) f:[{"t":"SOLID","c":[235,235,235,1]}] r:2
+            Unselected Asset Marker (RECTANGLE) [64x102] @(198,212) f:[{"t":"SOLID","c":[220,220,220,1]}] r:4
+            Area Name (FRAME) [40x16] @(213,229) f:[{"t":"SOLID","v":false,"o":0.12,"c":[255,255,255,1]}] r:4
+              PL-70T (TEXT) [32x16] @(4,0) tx:"PL-70T" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Anchor Point (ELLIPSE) [6x6] @(236,255) f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Selected Zone Marke (RECTANGLE) [64x89] @(127,230) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[102,102,102,1]],[1,[26,26,26,1]]],"gt":[[0.48523,0.62062,-0.05293],[-0.62062,0.48523,0.56769]]}] r:4
+            Area Name (FRAME) [40x16] @(143,240) f:[{"t":"SOLID","o":0.12,"c":[255,255,255,1]}] r:4
+              PL-02J (TEXT) [32x16] @(4,0) tx:"PL-02J" f:[{"t":"SOLID","c":[255,255,255,1]}]
+            Plot Boundary (VECTOR) [305x180] @(2,-31) f:[{"t":"SOLID","c":[235,235,235,1]}] r:2
+            Effect (RECTANGLE) [396x109] @(109,0) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[235,235,235,0]],[1,[235,235,235,1]]],"gt":[[0,1,0],[-23.22705,0,12.14699]]}]
+            Pointer Line (VECTOR) [221x51] @(-54,268) r:12
+            Anchor Point (ELLIPSE) [6x6] @(164,265) f:[{"t":"SOLID","c":[255,255,255,1]}]
+          Pop Up Information (FRAME) [170x96] @(0,248) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+            Spinach Garden 08 (TEXT) [146x22] @(12,12) tx:"Spinach Garden 08" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Description (FRAME) [146x42] @(12,42)
+              ID Desc (FRAME) [71x42] @(0,0)
+                ID (TEXT) [12x19] @(0,0) tx:"ID" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                PL-02J (TEXT) [39x19] @(0,23) tx:"PL-02J" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Area Desc (FRAME) [71x42] @(75,0)
+                Area (TEXT) [25x19] @(0,0) tx:"Area" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                200 m2 (TEXT) [43x19] @(0,23) tx:"200 m2" f:[{"t":"SOLID","c":[51,51,51,1]}]
+          Location Information (FRAME) [478x180] @(24,24)
+            Container (FRAME) [478x22] @(0,0)
+              Location (FRAME) [264x22] @(0,0)
+                MapPin (INSTANCE) [20x20] @(0,1) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [14x18] @(3,1) f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Weilburg, Germany (TEXT) [118x22] @(28,0) tx:"Weilburg, Germany" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Tue, 10 September 2024 (TEXT) [129x19] @(280,2) tx:"Tue, 10 September 2024" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              09:37 AM (TEXT) [53x19] @(425,2) tx:"09:37 AM" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            24°C (TEXT) [478x56] @(0,34) tx:"24°C" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Weather  (FRAME) [84x78] @(0,102)
+              Sun Icon (FRAME) [24x24] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                Vector (VECTOR) [24x24] @(0,0)
+                Vector (VECTOR) [23x23] @(1,1) f:[{"t":"GRADIENT_RADIAL","gs":[[0,[237,226,176,1]],[1,[241,203,29,1]]],"gt":[[-1.125,1.125,0.75],[-1.28548,-1.28548,1.78548]]}]
+              Sunny (TEXT) [33x19] @(0,32) tx:"Sunny " f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Description (FRAME) [84x19] @(0,59)
+                H:46°C (TEXT) [38x19] @(0,0) tx:"H:46°C" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                L:52°C (TEXT) [34x19] @(50,0) tx:"L:52°C" f:[{"t":"SOLID","c":[51,51,51,1]}]
+        Container (FRAME) [526x374] @(0,352)
+          Card Plant Report Item (FRAME) [526x186] @(0,0)
+            Card Plant Report (INSTANCE) [170x186] @(0,0) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}] r:8
+              Title (FRAME) [138x44] @(16,16)
+                Plant (INSTANCE) [18x18] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [17x14] @(1,3) f:[{"t":"SOLID","c":[255,255,255,1]}]
+                Plant Health (TEXT) [138x22] @(0,22) tx:"Plant Health" f:[{"t":"SOLID","c":[255,255,255,1]}]
+              Description (FRAME) [138x98] @(16,72)
+                Value Parameter (FRAME) [138x56] @(0,0)
+                  Container (FRAME) [79x56] @(0,0)
+                    94 (TEXT) [49x56] @(0,0) tx:"94" f:[{"t":"SOLID","c":[255,255,255,1]}]
+                    % (TEXT) [30x45] @(49,6) tx:"%" f:[{"t":"SOLID","c":[236,236,236,1]}]
+                  Indicator (FRAME) [44x20] @(87,18) f:[{"t":"SOLID","c":[255,255,255,1]}] r:12
+                    Good (TEXT) [36x16] @(4,2) tx:"Good" f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}]
+                Your plants are thriving and showing excellent health (TEXT) [138x38] @(0,60) tx:"Your plants are thriving and showing excellent health" f:[{"t":"SOLID","c":[255,255,255,1]}]
+              btn (FRAME) [36x36] @(134,0) f:[{"t":"SOLID","o":0.16,"c":[255,255,255,1]}] r:8
+                ArrowUpRight (INSTANCE) [20x20] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[255,255,255,1]}]
+            Card Plant Report (INSTANCE) [170x186] @(178,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+              Title (FRAME) [138x44] @(16,16)
+                Wind (INSTANCE) [18x18] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [16x12] @(1,3) f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Wind (TEXT) [138x22] @(0,22) tx:"Wind" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Details Button (FRAME) [36x36] @(134,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                ArrowUpRight (INSTANCE) [20x20] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Description (FRAME) [138x98] @(16,72)
+                Value Parameter (FRAME) [138x56] @(0,0)
+                  Container (FRAME) [74x56] @(0,0)
+                    2 (TEXT) [24x56] @(0,0) tx:"2" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                    m/s (TEXT) [50x45] @(24,6) tx:"m/s" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Make sure there is still adequate airflow (TEXT) [138x38] @(0,60) tx:"Make sure there is still adequate airflow" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Card Plant Report (INSTANCE) [170x186] @(356,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+              Title (FRAME) [138x44] @(16,16)
+                Thermometer (INSTANCE) [18x18] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [13x17] @(4,1) f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Wind (TEXT) [138x22] @(0,22) tx:"Temperature" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Details Button (FRAME) [36x36] @(134,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                ArrowUpRight (INSTANCE) [20x20] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Description (FRAME) [138x98] @(16,72)
+                Value Parameter (FRAME) [138x56] @(0,0)
+                  Container (FRAME) [71x56] @(0,0)
+                    2 (TEXT) [39x56] @(0,0) tx:"19" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                    m/s (TEXT) [32x45] @(39,6) tx:"°C" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Make sure there is still adequate airflow (TEXT) [138x38] @(0,60) tx:"Maintain consistent between 15°C and 20°C" f:[{"t":"SOLID","c":[51,51,51,1]}]
+          Card Plant Report Item (FRAME) [526x180] @(0,194)
+            Card Plant Report (INSTANCE) [170x180] @(0,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+              Title (FRAME) [138x44] @(16,13)
+                pH (INSTANCE) [18x18] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [18x18] @(0,0)
+                  Vector (VECTOR) [11x15] @(3,1)
+                  Vector (VECTOR) [6x3] @(6,9) f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Wind (TEXT) [138x22] @(0,22) tx:"pH Level" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Details Button (FRAME) [36x36] @(134,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                ArrowUpRight (INSTANCE) [20x20] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Description (FRAME) [138x98] @(16,69)
+                Value Parameter (FRAME) [138x56] @(0,0)
+                  Container (FRAME) [50x56] @(0,0)
+                    2 (TEXT) [50x56] @(0,0) tx:"7.6" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                    m/s (TEXT) [0x45] @(50,6) f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Make sure there is still adequate airflow (TEXT) [138x38] @(0,60) tx:"Add acidic compost to balance the pH" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Card Plant Report (INSTANCE) [170x180] @(178,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+              Title (FRAME) [138x44] @(16,13)
+                Drop (INSTANCE) [18x18] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [12x16] @(3,1) f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Wind (TEXT) [138x22] @(0,22) tx:"Humidity" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Details Button (FRAME) [36x36] @(134,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                ArrowUpRight (INSTANCE) [20x20] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Description (FRAME) [138x98] @(16,69)
+                Value Parameter (FRAME) [138x56] @(0,0)
+                  Container (FRAME) [77x56] @(0,0)
+                    2 (TEXT) [47x56] @(0,0) tx:"82" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                    m/s (TEXT) [30x45] @(47,6) tx:"%" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Make sure there is still adequate airflow (TEXT) [138x38] @(0,60) tx:"Sufficient to prevent mold growth" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Card Plant Report (INSTANCE) [170x180] @(356,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+              Title (FRAME) [138x44] @(16,13)
+                Soil Moisture (INSTANCE) [18x18] @(0,0) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Group (GROUP) [15x15] @(2,2)
+                    Vector (VECTOR) [10x8] @(6,6)
+                    Vector (VECTOR) [7x5] @(10,9)
+                    Vector (VECTOR) [4x5] @(13,12)
+                    Vector (VECTOR) [15x12] @(2,2)
+                Wind (TEXT) [138x22] @(0,22) tx:"Soil Moisture" f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Details Button (FRAME) [36x36] @(134,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                ArrowUpRight (INSTANCE) [20x20] @(8,8) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+              Description (FRAME) [138x98] @(16,69)
+                Value Parameter (FRAME) [138x56] @(0,0)
+                  Container (FRAME) [78x56] @(0,0)
+                    2 (TEXT) [48x56] @(0,0) tx:"65" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                    m/s (TEXT) [30x45] @(48,6) tx:"%" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Make sure there is still adequate airflow (TEXT) [138x38] @(0,60) tx:"Keep monitoring to ensure it remains consistent" f:[{"t":"SOLID","c":[51,51,51,1]}]
+      Container (FRAME) [526x726] @(550,16)
+        Device Card (FRAME) [259x726] @(0,0) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+          Device (TEXT) [227x26] @(16,16) tx:"Device" f:[{"t":"SOLID","c":[51,51,51,1]}]
+          Description (FRAME) [227x42] @(16,58)
+            Sensor Desc (FRAME) [111x42] @(0,0)
+              Sensor (TEXT) [111x19] @(0,0) tx:"Sensor" f:[{"t":"SOLID","c":[164,164,164,1]}]
+              5 (TEXT) [111x19] @(0,23) tx:"5" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Camera Desc (FRAME) [111x42] @(115,0)
+              Camera (TEXT) [111x19] @(0,0) tx:"Camera" f:[{"t":"SOLID","c":[164,164,164,1]}]
+              2 (TEXT) [111x19] @(0,23) tx:"2" f:[{"t":"SOLID","c":[51,51,51,1]}]
+          Device List  (FRAME) [227x594] @(16,116)
+            Card List (INSTANCE) [227x93] @(0,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+              Circle Indicator (INSTANCE) [20x20] @(12,12)
+                Vector (VECTOR) [8x8] @(6,6) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}]
+              Description (FRAME) [203x45] @(12,36)
+                Device Name (TEXT) [203x22] @(0,0) tx:"Soil Moisture (Ref. 9248-P)" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Detail Info (FRAME) [203x19] @(0,26)
+                  Device (TEXT) [76x19] @(0,0) tx:"Smart Farm 01" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(84,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Sensor (TEXT) [36x19] @(97,0) tx:"Sensor" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(141,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Device Model (TEXT) [49x19] @(154,0) tx:"Libelium Plug & Sense" f:[{"t":"SOLID","c":[164,164,164,1]}]
+            Card List (INSTANCE) [227x115] @(0,101) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+              Circle Indicator (INSTANCE) [20x20] @(12,12)
+                Vector (VECTOR) [8x8] @(6,6) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}]
+              Description (FRAME) [203x67] @(12,36)
+                Device Name (TEXT) [203x44] @(0,0) tx:"Temperature (Pt1000 Probe - Ref. 9255-P)" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Detail Info (FRAME) [203x19] @(0,48)
+                  Device (TEXT) [76x19] @(0,0) tx:"Smart Farm 01" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(84,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Sensor (TEXT) [36x19] @(97,0) tx:"Sensor" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(141,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Device Model (TEXT) [49x19] @(154,0) tx:"Libelium Plug & Sense" f:[{"t":"SOLID","c":[164,164,164,1]}]
+            Card List (INSTANCE) [227x146] @(0,224) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+              Circle Indicator (INSTANCE) [20x20] @(12,12)
+                Vector (VECTOR) [8x8] @(6,6) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[249,173,25,1]],[1,[227,151,4,1]]],"gt":[[0.47226,0.66421,-0.06824],[-0.66421,0.47226,0.59597]]}]
+              Description (FRAME) [203x67] @(12,36)
+                Device Name (TEXT) [203x44] @(0,0) tx:"Humidity - Honeywell HIH Series (Ref. 9370-P)" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Detail Info (FRAME) [203x19] @(0,48)
+                  Device (TEXT) [76x19] @(0,0) tx:"Smart Farm 01" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(84,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Sensor (TEXT) [36x19] @(97,0) tx:"Sensor" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(141,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Device Model (TEXT) [49x19] @(154,0) tx:"Libelium Plug & Sense" f:[{"t":"SOLID","c":[164,164,164,1]}]
+              Indicator State (INSTANCE) [203x27] @(12,107) f:[{"t":"SOLID","o":0.1,"c":[249,173,25,1]}] r:4
+                Warning (INSTANCE) [16x16] @(8,6) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [14x13] @(1,2) f:[{"t":"SOLID","c":[249,173,25,1]}]
+                Warning (TEXT) [148x19] @(28,4) tx:"Signal issue since 08:02 AM" f:[{"t":"SOLID","c":[249,173,25,1]}]
+            Card List (INSTANCE) [227x115] @(0,378) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+              Circle Indicator (INSTANCE) [20x20] @(12,12)
+                Vector (VECTOR) [8x8] @(6,6) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}]
+              Description (FRAME) [203x67] @(12,36)
+                Device Name (TEXT) [203x44] @(0,0) tx:"Water pH (pH Probe PHEHT - Ref. 9485-P)" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Detail Info (FRAME) [203x19] @(0,48)
+                  Device (TEXT) [76x19] @(0,0) tx:"Smart Farm 01" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(84,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Sensor (TEXT) [36x19] @(97,0) tx:"Sensor" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(141,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Device Model (TEXT) [49x19] @(154,0) tx:"Libelium Plug & Sense" f:[{"t":"SOLID","c":[164,164,164,1]}]
+            Card List (INSTANCE) [227x93] @(0,501) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+              Circle Indicator (INSTANCE) [20x20] @(12,12)
+                Vector (VECTOR) [8x8] @(6,6) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}]
+              Description (FRAME) [203x45] @(12,36)
+                Device Name (TEXT) [203x22] @(0,0) tx:"VL‑CM140KT Camera " f:[{"t":"SOLID","c":[51,51,51,1]}]
+                Detail Info (FRAME) [203x19] @(0,26)
+                  Device (TEXT) [79x19] @(0,0) tx:"#VL‑CM140KT" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(87,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Sensor (TEXT) [36x19] @(100,0) tx:"Sensor" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  • (TEXT) [5x16] @(144,2) tx:"•" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                  Device Model (TEXT) [46x19] @(157,0) tx:"Libelium Plug & Sense" f:[{"t":"SOLID","c":[164,164,164,1]}]
+          Scroll Fade (RECTANGLE) [258x64] @(1,662) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[250,250,250,0]],[1,[250,250,250,1]]],"gt":[[0,1,0],[-23.22705,0,12.14699]]}]
+          Details Button (FRAME) [44x44] @(215,1) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+            ArrowUpRight (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+              Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+        Container (FRAME) [259x726] @(267,0)
+          Camera (INSTANCE) [259x248] @(0,0)
+            Camera Image 1 (INSTANCE) [259x248] @(0,0) f:[{"t":"IMAGE","sm":"FILL","ih":"062838b9038a7f8d1a1d6b6992c58bafa5358386","it":[[1,0,0],[0,1,0]],"sf":0.5},{"t":"GRADIENT_LINEAR","o":0.72,"gs":[[0,[31,31,31,0]],[0.85,[31,31,31,1]]],"gt":[[0,3.28767,-2.28767],[-3.28767,0,2.14384]]},{"t":"GRADIENT_LINEAR","o":0.72,"gs":[[0,[31,31,31,1]],[1,[31,31,31,0]]],"gt":[[0,4.0565,0],[-4.0565,0,2.52825]]}] r:8
+            Camera Info (INSTANCE) [259x46] @(0,0)
+              Camera Signal (FRAME) [235x22] @(12,12)
+                Signal  Duotone (INSTANCE) [16x16] @(0,3) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [16x16] @(0,0)
+                  Vector (VECTOR) [0x8] @(10,5)
+                  Vector (VECTOR) [0x11] @(13,2)
+                  Vector (VECTOR) [0x6] @(8,7)
+                  Vector (VECTOR) [0x3] @(5,10)
+                  Vector (VECTOR) [0x1] @(3,12)
+                Camera 1 (TEXT) [59x22] @(20,0) tx:"Camera 1" f:[{"t":"SOLID","c":[255,255,255,1]}]
+            Camera Control Button (INSTANCE) [259x68] @(0,180)
+              1/5 (TEXT) [43x16] @(12,26) tx:"1/5" f:[{"t":"SOLID","c":[255,255,255,1]}]
+              btn-menu (FRAME) [44x44] @(59,12) f:[{"t":"SOLID","o":0.36,"c":[255,255,255,1]}] r:8
+                ArrowLeft (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [15x13] @(3,4) f:[{"t":"SOLID","c":[236,236,236,1]}]
+              btn-menu (FRAME) [44x44] @(107,12) f:[{"t":"SOLID","o":0.36,"c":[255,255,255,1]}] r:8
+                Camera (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [16x14] @(2,3) f:[{"t":"SOLID","c":[255,255,255,1]}]
+              btn-menu (FRAME) [44x44] @(155,12) f:[{"t":"SOLID","o":0.36,"c":[255,255,255,1]}] r:8
+                BellSimpleRinging (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [16x17] @(2,1) f:[{"t":"SOLID","c":[255,255,255,1]}]
+              btn-menu (FRAME) [44x44] @(203,12) f:[{"t":"SOLID","o":0.36,"c":[255,255,255,1]}] r:8
+                ArrowRight (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                  Vector (VECTOR) [15x13] @(3,4) f:[{"t":"SOLID","c":[255,255,255,1]}]
+            btn (FRAME) [44x44] @(215,0) f:[{"t":"SOLID","o":0.36,"c":[255,255,255,1]}] r:8
+              ArrowUpRight (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[255,255,255,1]}]
+          Details Button (FRAME) [44x44] @(216,0) f:[{"t":"SOLID","o":0.36,"c":[255,255,255,1]}] r:8
+            ArrowUpRight (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+              Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[255,255,255,1]}]
+          Task Card (FRAME) [259x470] @(0,256) f:[{"t":"SOLID","c":[236,236,236,1]}] r:8
+            Task (TEXT) [227x26] @(16,16) tx:"Task" f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Task Progress Indicator (FRAME) [227x31] @(16,58)
+              Progress Bar (FRAME) [227x4] @(0,0) f:[{"t":"SOLID","c":[220,220,220,1]}] r:32
+                Active (RECTANGLE) [87x4] @(1,0) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}] r:32
+              Description (FRAME) [227x19] @(0,12)
+                40% (TEXT) [28x19] @(0,0) tx:"40%" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                2/5 Task Completed (TEXT) [103x19] @(124,0) tx:"2/5 Task Completed"
+            Task List (FRAME) [227x464] @(16,105)
+              Task Item (INSTANCE) [227x111] @(0,0) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                Description (FRAME) [183x87] @(12,12)
+                  Watering (TEXT) [187x22] @(0,0) tx:"Watering" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  Water plants with 1 inch of water in the morning (TEXT) [183x38] @(0,26) tx:"Water plants with 1 inch of water in the morning" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  07:00 AM - 07:30 AM (TEXT) [183x19] @(0,68) tx:"07:00 AM - 07:30 AM" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Checkbox (INSTANCE) [16x16] @(199,12) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}] r:32
+                  Check (INSTANCE) [8x8] @(4,4) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                    Check (VECTOR) [6x5] @(1,2) f:[{"t":"SOLID","c":[255,255,255,1]}]
+              Task Item (INSTANCE) [227x111] @(0,119) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                Description (FRAME) [183x87] @(12,12)
+                  Watering (TEXT) [187x22] @(0,0) tx:"Fertilizing" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  Water plants with 1 inch of water in the morning (TEXT) [183x38] @(0,26) tx:"Apply organic fertilizer at base of plants. Quantity: 50g per plant" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  07:00 AM - 07:30 AM (TEXT) [183x19] @(0,68) tx:"07:30 AM - 10:00 AM" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Checkbox (INSTANCE) [16x16] @(199,12) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[53,197,110,1]],[1,[46,144,85,1]]],"gt":[[0.33833,0.56451,0.17498],[-0.56451,0.22749,0.70718]]}] r:32
+                  Check (INSTANCE) [8x8] @(4,4) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                    Check (VECTOR) [6x5] @(1,2) f:[{"t":"SOLID","c":[255,255,255,1]}]
+              Task Item (INSTANCE) [227x109] @(0,238) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                Description (FRAME) [183x85] @(12,12)
+                  Watering (TEXT) [187x20] @(0,0) tx:"Pest Inspection" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  Water plants with 1 inch of water in the morning (TEXT) [183x38] @(0,24) tx:"Check leaves for any signs of aphids or other pests" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  07:00 AM - 07:30 AM (TEXT) [183x19] @(0,66) tx:"10:00 AM - 11:00 AM" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Checkbox (INSTANCE) [16x16] @(199,12) r:32
+              Task Item (INSTANCE) [227x109] @(0,355) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+                Description (FRAME) [183x85] @(12,12)
+                  Watering (TEXT) [187x20] @(0,0) tx:"Soil Aeration" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  Water plants with 1 inch of water in the morning (TEXT) [183x38] @(0,24) tx:"Loosen soil around the plants carefully without damaging roots" f:[{"t":"SOLID","c":[51,51,51,1]}]
+                  07:00 AM - 07:30 AM (TEXT) [183x19] @(0,66) tx:"02:00 PM - 03:00 PM" f:[{"t":"SOLID","c":[164,164,164,1]}]
+                Checkbox (INSTANCE) [16x16] @(199,12) r:32
+            Details Button (FRAME) [44x44] @(215,1) f:[{"t":"SOLID","c":[244,244,244,1]}] r:8
+              ArrowUpRight (INSTANCE) [20x20] @(12,12) f:[{"t":"SOLID","v":false,"c":[255,255,255,1]}]
+                Vector (VECTOR) [11x11] @(4,4) f:[{"t":"SOLID","c":[51,51,51,1]}]
+            Scroll Fade (RECTANGLE) [259x64] @(1,406) f:[{"t":"GRADIENT_LINEAR","gs":[[0,[250,250,250,0]],[1,[250,250,250,1]]],"gt":[[0,1,0],[-23.22705,0,12.14699]]}]

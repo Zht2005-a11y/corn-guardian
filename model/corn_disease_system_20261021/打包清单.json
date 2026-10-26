@@ -1,0 +1,9 @@
+{
+  "package": "corn_disease_system_20261021",
+  "created_at": "2026-10-21T17:15:34",
+  "includes_weights": true,
+  "includes_dataset": false,
+  "file_count": 58,
+  "uncompressed_mb": 199.9,
+  "entry_point": "run_server.bat 或 python -m uvicorn app.api:app --port 8010"
+}

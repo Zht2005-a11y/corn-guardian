@@ -1,0 +1,103 @@
+# === 打包版本：数据集路径已改为包内相对路径 ===
+# 收件人若自行准备数据集，请把下方 data.sources[].root 改成自己的路径（支持相对路径）。
+# =========================================================
+# 玉米病虫害识别系统 全局配置
+# 所有路径均支持相对路径（相对于项目根目录 corn_disease_system/）
+# =========================================================
+
+# ---------- 数据集 ----------
+data:
+  # 可配置多个数据集，训练时自动合并（后续新增数据集只需在此追加一项）
+  # 每个数据集必须符合 ImageFolder 结构: <root>/<split>/<类别名>/*.jpg
+  sources:
+    - name: MCDD
+      root: "D:/shijianzhou/sjzprogram/dataset/MCDD/data"
+      # 训练/验证/测试子目录名
+      train_dir: train
+      test_dir: test
+      # 该数据集参与训练（为 False 时只在测试集评估中作交叉验证来源）
+      use_for_train: true
+
+    - name: PV_CORN
+      root: "D:/shijianzhou/date_all/corn_dataset/raw"
+      train_dir: color
+      test_dir: color
+      use_for_train: true
+      evaluate: false
+
+  # 类别名（ImageFolder 的文件夹名，顺序即 label 索引顺序，请勿随意改动）
+  class_names: ["Blight", "Common_Rust", "Gray_Leaf_Spot", "Healthy"]
+
+  # MCDD 官方仅给 train/test，这里从 train 中按比例切出验证集
+  val_ratio: 0.15
+  split_seed: 42
+  # GPU 训练时数据加载不能拖后腿（RTX 4060 8G 上 ResNet50 约 150~200 img/s），
+  # 8 个 worker 足够喂满显卡；纯 CPU 训练请改回 4 或更小。
+  num_workers: 8
+
+# ---------- 模型 ----------
+model:
+  name: "resnet50"          # resnet50 | mobilenet_v3_large | resnet50_cbam
+  num_classes: 4
+  pretrained: true
+  dropout: 0.3              # 分类头 dropout
+  use_cbam: false           # 是否在 stage3/stage4 后插入 CBAM 注意力
+  label_smoothing: 0.1      # 标签平滑系数（0 表示关闭）
+  class_weighted_loss: false  # 是否使用按类别频率加权的交叉熵
+
+# ---------- 训练 ----------
+train:
+  image_size: 224
+  batch_size: 32            # RTX 4060 8G + AMP 实测可跑 32；OOM 时降到 16
+  epochs_stage1: 5          # 阶段一：冻结骨干，只训练分类头
+  epochs_stage2: 20         # 阶段二：解冻最后 2 个残差块微调
+  lr_stage1: 1.0e-3         # 分类头学习率
+  lr_stage2: 1.0e-4         # 微调学习率（比阶段一小一个量级）
+  weight_decay: 1.0e-4
+  warmup_epochs: 1
+  cosine_eta_min: 1.0e-6    # 余弦退火最小学习率
+  freeze_until: "layer2"    # 解冻 layer3、layer4（ResNet 命名）
+  amp: true                 # 混合精度训练（仅 CUDA 生效）
+  seed: 42
+  save_dir: "outputs/checkpoints"
+  best_name: "best_corn_model.pth"
+
+# ---------- 评估 / 推理 ----------
+infer:
+  device: "auto"            # auto | cpu | cuda
+  max_image_side: 4096      # 超过该边长的图片直接拒绝，防止内存爆炸
+  confidence_high: 0.85     # 高置信度阈值
+  confidence_mid: 0.60      # 中置信度阈值（低于此值视为不可信）
+
+# ---------- 后端服务 ----------
+server:
+  host: "0.0.0.0"
+  port: 8010                 # 8000 被本机 CLodopPrint32 打印控件占用，故改用 8010
+  cors_origins: ["*"]
+  max_upload_mb: 10
+  cache_size: 256            # 预处理结果 LRU 缓存条数
+  # 服务启动时加载的模型：key 为前端可选的模型标识
+  models:
+    resnet50:
+      path: "outputs/checkpoints/best_corn_model.pth"
+      arch: "resnet50"
+    mobilenet_v3_large:
+      path: "outputs/checkpoints/best_corn_mobilenetv3.pth"
+      arch: "mobilenet_v3_large"
+    # 文本含 "cbam" 时预测器会自动启用 CBAM 模块（见 src/predictor.py）
+    resnet50_cbam:
+      path: "outputs/checkpoints/best_corn_model_cbam.pth"
+      arch: "resnet50_cbam"
+  default_model: "resnet50"
+
+# ---------- 大语言模型 AI 专家问答配置 ----------
+llm:
+  enabled: true
+  provider: "agnes"
+  base_url: "https://apihub.agnes-ai.cn/v1"
+  api_key: ""   # 留空则从环境变量 AGNES_API_KEY 读取；请勿把真实密钥提交到仓库
+  model: "agnes-3.0-flash"
+  timeout: 35.0
+  temperature: 0.3
+  max_tokens: 1024
+

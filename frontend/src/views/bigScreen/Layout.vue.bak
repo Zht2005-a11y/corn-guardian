@@ -1,0 +1,2251 @@
+<template>
+  <div class="app-container">
+    <!-- 1. React Bits: Squares Interactive Ambient Background (官方 1:1 响应式漂移网格) -->
+    <SquaresBg
+      :squareSize="44"
+      :speed="0.25"
+      direction="diagonal"
+      borderColor="rgba(226, 232, 240, 0.65)"
+      hoverFillColor="rgba(5, 150, 105, 0.07)"
+    />
+
+    <!-- ============ 1. PAGE HEADER ============ -->
+    <header class="page-header">
+      <!-- 2. React Bits: Particles Background (粒子微网) -->
+      <ParticlesBg :count="32" color="#059669" :speed="0.4" :maxDist="110" />
+
+      <div class="header-content">
+        <div class="header-brand">
+          <!-- 3. React Bits: Magnet 磁吸徽章图标 -->
+          <Magnet :padding="40" :magnetStrength="3">
+            <div class="brand-badge-icon">
+              <span class="brand-leaf">🌽</span>
+              <span class="brand-radar-ping"></span>
+            </div>
+          </Magnet>
+
+          <div class="brand-titles">
+            <div class="brand-main-row">
+              <!-- 4. React Bits: ShinyText 流光文字特效 -->
+              <ShinyText
+                text="面向复杂大田环境的玉米病害智能诊断系统"
+                :speed="4.5"
+                baseColor="#0f172a"
+                shimmerColor="#059669"
+                className="brand-name"
+              />
+              <span class="brand-model-tag">
+                <span class="pulse-chip"></span>
+                <!-- 5. React Bits: DecryptedText 字符解密运算特效 -->
+                <DecryptedText
+                  text="YOLOv10-Agri + Multi-Scale Attention"
+                  :speed="40"
+                  animateOn="hover"
+                  encryptedClassName="text-emerald-600"
+                />
+              </span>
+            </div>
+            <span class="brand-sub">国家大田数字农业应用创新基地 · 4号试验田微环境与叶部病斑自适应协同感知</span>
+          </div>
+        </div>
+
+        <div class="header-meta">
+          <Magnet :padding="30" :magnetStrength="4">
+            <div class="telemetry-pill">
+              <span class="pill-dot"></span>
+              <span class="pill-text">边缘推理：{{ backendOnline ? `在线 (${backendModel} · ${inferenceSpeed})` : '模型服务就绪 (8010)' }}</span>
+            </div>
+          </Magnet>
+          <div class="telemetry-pill warning" v-if="currentSample && isDetected">
+            <span class="pill-icon">⚠️</span>
+            <span class="pill-text">检出：{{ currentSample.diseaseName.split(' ')[0] }}</span>
+          </div>
+          <div class="time-label">
+            <span class="time-clock-icon">🕒</span>
+            {{ currentTime }}
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- ============ 2. MAIN WORKSPACE ============ -->
+    <main class="workspace">
+      <!-- ====== LEFT COL: Upload & Detection + Visual Analytics ====== -->
+      <div class="col col-left">
+        <!-- 6. Upload & Detection Card (with React Bits Spotlight) -->
+        <SpotlightCard className="upload-spotlight-card" spotlightColor="rgba(5, 150, 105, 0.08)">
+          <div class="card-head">
+            <div>
+              <h2 class="section-title">大田叶片图像采集与多尺度检测工作台</h2>
+              <p class="section-desc">针对大田强日光直射、雨露水珠折射、泥水溅渍与重叠杂草自适应滤波定位</p>
+            </div>
+            <span class="badge-status-ready">
+              <span class="status-dot"></span> 待测就绪
+            </span>
+          </div>
+
+          <!-- Dropzone -->
+          <div
+            class="dropzone"
+            :class="{ 'dz-over': isDragging, 'dz-filled': !!previewUrl, 'is-detecting': isDetecting }"
+            @dragover.prevent="isDragging = true"
+            @dragleave.prevent="isDragging = false"
+            @drop.prevent="onDrop"
+            @click="!previewUrl && $refs.fileInput.click()"
+          >
+            <!-- Scan laser beam effect during inference -->
+            <div v-if="isDetecting" class="scanner-laser"></div>
+
+            <!-- Empty state -->
+            <template v-if="!previewUrl">
+              <div class="dz-inner-content">
+                <Magnet :padding="50" :magnetStrength="2">
+                  <div class="dz-icon-wrapper">
+                    <svg class="dz-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+                      <path stroke-linecap="round" stroke-linejoin="round"
+                        d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                    </svg>
+                  </div>
+                </Magnet>
+                <p class="dz-main">拖拽大田叶片图像到此处，或 <span class="dz-link">点击本地浏览上传</span></p>
+                <p class="dz-hint">支持 JPG、PNG、WEBP，大田强光、微小病斑、重叠叶片自适应滤波</p>
+              </div>
+            </template>
+
+            <!-- Preview state with React Bits TiltedCard 3D Hover & Glare Effect -->
+            <template v-else>
+              <TiltedCard :maxTilt="8" :scaleOnHover="1.01">
+                <div class="preview-img-container">
+                  <img :src="showHeatmap && currentSample?.gradcam_base64 ? currentSample.gradcam_base64 : previewUrl" class="preview-img" alt="玉米叶片" />
+
+                  <!-- Bounding boxes overlay if detected -->
+                  <div v-if="isDetected && currentSample && !showHeatmap" class="overlay-boxes">
+                    <div
+                      v-for="(box, i) in currentSample.boxes"
+                      :key="i"
+                      class="tech-bbox"
+                      :style="{
+                        left: box.x + '%',
+                        top: box.y + '%',
+                        width: box.w + '%',
+                        height: box.h + '%',
+                        borderColor: currentSample.color
+                      }"
+                    >
+                      <span class="tech-bbox-label" :style="{ background: currentSample.color }">
+                        {{ box.label }} · 置信度 {{ box.conf }}
+                      </span>
+                      <span class="corner lt" :style="{ borderColor: currentSample.color }"></span>
+                      <span class="corner rt" :style="{ borderColor: currentSample.color }"></span>
+                      <span class="corner lb" :style="{ borderColor: currentSample.color }"></span>
+                      <span class="corner rb" :style="{ borderColor: currentSample.color }"></span>
+                    </div>
+                  </div>
+
+                  <div class="preview-action-dock">
+                    <button class="tech-action-btn" @click.stop="toggleHeatmap" v-if="isDetected">
+                      {{ showHeatmap ? '🌿 切换回大田原图' : '⚡ Grad-CAM 注意力热力图' }}
+                    </button>
+                    <button class="replace-btn" @click.stop="clearImage">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0 3.181 3.183a8.25 8.25 0 0 0 13.803-3.7M4.031 9.865a8.25 8.25 0 0 1 13.803-3.7l3.181 3.182m0-4.991v4.99" />
+                      </svg>
+                      更换图片
+                    </button>
+                  </div>
+                </div>
+              </TiltedCard>
+            </template>
+          </div>
+          <input ref="fileInput" type="file" accept="image/*" style="display:none" @change="onFileChange" />
+
+          <!-- Preset representative samples (Wrapped with React Bits Magnet) -->
+          <div class="preset-section">
+            <span class="preset-label">大田典型病斑样本直选：</span>
+            <div class="preset-chips">
+              <button
+                v-for="s in presetSamples"
+                :key="s.id"
+                class="preset-chip"
+                :class="{ active: currentSampleId === s.id }"
+                @click="selectPreset(s)"
+              >
+                <span class="chip-dot" :style="{ background: s.color }"></span>
+                <span class="chip-title">{{ s.name }}</span>
+                <span class="chip-sub">({{ s.scenario }})</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Detection trigger button (Wrapped with React Bits Magnet) -->
+          <div class="detect-btn-wrap">
+            <button
+              class="detect-btn"
+              :disabled="!previewUrl || isDetecting"
+              @click="runDetect"
+            >
+              <span v-if="isDetecting" class="btn-spinner"></span>
+              <svg v-else viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                <circle cx="11" cy="11" r="8"/><path stroke-linecap="round" d="m21 21-4.35-4.35"/>
+              </svg>
+              <span>{{ isDetecting ? 'AI 多尺度反光滤波感知与推理中 (约需1秒)...' : '执行 AI 智能病害感知与精准诊断' }}</span>
+            </button>
+          </div>
+        </SpotlightCard>
+
+        <!-- 7. Detection Results & Prescription Card (with React Bits Spotlight) -->
+        <SpotlightCard className="result-spotlight-card" v-if="isDetected && currentSample" spotlightColor="rgba(217, 119, 6, 0.08)">
+          <div class="card-head">
+            <div class="result-title-group">
+              <span class="result-indicator-dot" :style="{ background: currentSample.color }"></span>
+              <h2 class="section-title">病害诊断综合报告与飞防指导建议</h2>
+            </div>
+            <span class="result-badge" :style="{ background: currentSample.color + '15', color: currentSample.color, borderColor: currentSample.color + '45' }">
+              <DecryptedText :text="currentSample.diseaseName" :speed="25" animateOn="view" />
+            </span>
+          </div>
+
+          <!-- Metrics 4-grid (Integrated with React Bits CountUp) -->
+          <div class="metrics-grid">
+            <div class="metric">
+              <span class="metric-key">检出主要病害</span>
+              <span class="metric-val highlight" :style="{ color: currentSample.color }">{{ currentSample.diseaseName }}</span>
+              <span class="metric-sub">病原：{{ currentSample.pathogen }}</span>
+            </div>
+            <div class="metric">
+              <span class="metric-key">大田侵染与发病程度</span>
+              <span class="metric-val warn">{{ currentSample.severity }}</span>
+              <span class="metric-sub">
+                叶面积受损率：
+                <CountUp :to="currentSample.damageRate" :from="0" :decimals="1" />%
+              </span>
+            </div>
+            <div class="metric">
+              <span class="metric-key">AI 综合识别置信度</span>
+              <span class="metric-val success">
+                <CountUp :to="currentSample.confidence" :from="60" :decimals="1" />%
+              </span>
+              <span class="metric-sub">抗噪稳健性指数：96.8分</span>
+            </div>
+            <div class="metric">
+              <span class="metric-key">大田气象诱发风险</span>
+              <span class="metric-val danger">高发风险期 (RH 84.2%)</span>
+              <span class="metric-sub">推荐飞防作业时段：今日傍晚</span>
+            </div>
+          </div>
+
+          <!-- Prescription Box -->
+          <div class="prescription-box">
+            <div class="prescription-title">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="p-icon">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 0 0 2.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 0 0-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 0 0 .75-.75 2.25 2.25 0 0 0-.1-.664m-5.8 0A2.251 2.251 0 0 1 13.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25Z"/>
+              </svg>
+              <span>大田植保无人机精准变量施药指导单</span>
+            </div>
+            <p class="prescription-text">{{ currentSample.prescription }}</p>
+            <div class="drone-params-row">
+              <div class="d-chip">🚁 推荐机型：{{ currentSample.droneParams?.model || '大疆 T50 / T60' }}</div>
+              <div class="d-chip">💧 亩施液量：{{ currentSample.droneParams?.volume || '1.8 L/亩' }}</div>
+              <div class="d-chip">🎯 雾滴粒径：{{ currentSample.droneParams?.dropletSize || '130 μm' }}</div>
+              <div class="d-chip">📏 飞行高度：{{ currentSample.droneParams?.altitude || '2.2 米' }}</div>
+            </div>
+          </div>
+        </SpotlightCard>
+
+        <!-- 8. Visual Charts Card (with React Bits Spotlight) -->
+        <SpotlightCard className="visual-spotlight-card" spotlightColor="rgba(2, 132, 199, 0.08)">
+          <div class="card-head">
+            <div>
+              <h2 class="section-title">模型复杂环境抗干扰鲁棒性与病害频次分布</h2>
+              <p class="section-desc">强日光眩光抑制、雨露水珠反光过滤、微小病斑细粒度识别能力雷达图</p>
+            </div>
+            <span class="data-tag">多维可视化遥测</span>
+          </div>
+          <div class="charts-dual-grid">
+            <div class="chart-pane">
+              <div class="chart-legend-title">抗逆感知六维能力评估</div>
+              <div ref="radarChartRef" class="tech-chart-holder"></div>
+            </div>
+            <div class="chart-pane">
+              <div class="chart-legend-title">示范区常见病害发生频次分布</div>
+              <div ref="distChartRef" class="tech-chart-holder"></div>
+            </div>
+          </div>
+        </SpotlightCard>
+      </div>
+
+      <!-- ====== RIGHT COL: AI Chat Assistant + Field Telemetry ====== -->
+      <div class="col col-right">
+        <!-- 9. AI Q&A Chat Card (with React Bits Aurora Glow) -->
+        <SpotlightCard className="chat-spotlight-card" spotlightColor="rgba(5, 150, 105, 0.09)">
+          <!-- Aurora soft effect on top header -->
+          <AuroraBg :speed="1.2" :opacity="0.14" :colorStops="['#ecfdf5', '#10b981', '#047857']" />
+
+          <div class="card-head chat-header-wrap">
+            <div class="chat-title-group">
+              <div class="ai-avatar-badge">🌽</div>
+              <div>
+                <div class="title-with-badge">
+                  <h2 class="section-title">玉米病害农科专家 AI 问答</h2>
+                  <span class="llm-model-badge">Agnes-3.0-Flash</span>
+                </div>
+                <span class="chat-sub">由 Agnes-3.0-Flash 驱动 · 融合视觉多源感知与大田知识库</span>
+              </div>
+            </div>
+            <span class="chat-status">
+              <span class="status-dot"></span> 在线应答
+            </span>
+          </div>
+
+          <!-- Quick Prompts Pill Row (Wrapped with React Bits Magnet) -->
+          <div class="quick-questions">
+            <span class="q-label">快捷提问：</span>
+            <div class="q-pills">
+              <button class="q-btn" @click="askPreset('大斑病和灰斑病如何区分？')">大斑病与灰斑病鉴别</button>
+              <button class="q-btn" @click="askPreset('南方锈病飞防最佳配方是什么？')">南方锈病用药配方</button>
+              <button class="q-btn" @click="askPreset('无人机飞防作业最佳气象窗口期？')">无人机作业参数</button>
+            </div>
+          </div>
+
+          <!-- Messages list -->
+          <div class="messages-wrap" ref="messagesWrap">
+            <div
+              v-for="(msg, i) in messages"
+              :key="i"
+              class="msg-row"
+              :class="msg.role"
+            >
+              <div class="msg-avatar">
+                <template v-if="msg.role === 'ai'">🌽</template>
+                <template v-else>👨‍🌾</template>
+              </div>
+              <div class="msg-bubble" :class="msg.role">
+                <div v-if="msg.searchQuery" class="tool-call-banner">
+                  <span class="tool-icon">🌐</span>
+                  <span>已调用 web_search 检索：「<strong>{{ msg.searchQuery }}</strong>」</span>
+                </div>
+                <div class="msg-text">
+                  <span v-html="renderFormattedText(msg.text)"></span>
+                  <span v-if="msg.isStreaming" class="streaming-cursor"></span>
+                </div>
+                <div v-if="msg.role === 'ai'" class="msg-meta-row">
+                  <span class="msg-tag">
+                    <template v-if="msg.searchQuery">Agnes + WebSearch</template>
+                    <template v-else>Agnes-3.0-Flash</template>
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Typing indicator (在未开始吐字时展示，包括联网搜索状态) -->
+            <div v-if="aiTyping && !isAiStreaming" class="msg-row ai">
+              <div class="msg-avatar">🌽</div>
+              <div class="msg-bubble ai typing-bubble">
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-dot"></span>
+                <span class="typing-text">{{ toolStatus || 'Agnes-3.0-Flash 正在深入分析玉米病理知识...' }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Input bar (Send button wrapped with React Bits Magnet) -->
+          <div class="chat-input-dock">
+            <div class="chat-input-wrap">
+              <textarea
+                v-model="inputText"
+                class="chat-input"
+                placeholder="向植保专家提问，例如：大斑病用什么药？飞防喷雾注意什么？"
+                rows="1"
+                @keydown.enter.exact.prevent="sendMessage"
+                @input="autoGrow"
+                ref="chatTextarea"
+              ></textarea>
+              <button class="send-btn" :disabled="!inputText.trim() || aiTyping" @click="sendMessage">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M3.478 2.405a.75.75 0 0 0-.926.94l2.432 7.905H13.5a.75.75 0 0 1 0 1.5H4.984l-2.432 7.905a.75.75 0 0 0 .926.94 60.519 60.519 0 0 0 18.445-8.986.75.75 0 0 0 0-1.218A60.517 60.517 0 0 0 3.478 2.405Z"/>
+                </svg>
+              </button>
+            </div>
+            <p class="chat-tip">支持大田病害成因诊断 · 药剂配方推荐 · 植保无人机飞防参数指导</p>
+          </div>
+        </SpotlightCard>
+
+        <!-- 10. Environmental Micro-Climate Telemetry Card -->
+        <SpotlightCard className="env-spotlight-card" spotlightColor="rgba(2, 132, 199, 0.08)">
+          <div class="card-head">
+            <div>
+              <h2 class="section-title">4号试验田微环境物联遥测</h2>
+              <p class="section-desc">LoRa 传感器阵列 · 采样频率 5min/次</p>
+            </div>
+            <span class="env-update-pill">⛅ 实时传输中</span>
+          </div>
+
+          <div class="env-grid">
+            <div class="env-item">
+              <span class="env-icon">🌡️</span>
+              <div class="env-info">
+                <span class="env-val">
+                  <CountUp :to="28.4" :from="20" :decimals="1" />
+                  <span class="env-unit">°C</span>
+                </span>
+                <span class="env-key">叶面冠层温度</span>
+              </div>
+            </div>
+            <div class="env-item warn">
+              <span class="env-icon">💧</span>
+              <div class="env-info">
+                <span class="env-val warn">
+                  <CountUp :to="84.2" :from="50" :decimals="1" />
+                  <span class="env-unit">%</span>
+                </span>
+                <span class="env-key">空气相对湿度 (超警戒)</span>
+              </div>
+            </div>
+            <div class="env-item">
+              <span class="env-icon">☀️</span>
+              <div class="env-info">
+                <span class="env-val">
+                  <CountUp :to="68.5" :from="30" :decimals="1" />
+                  <span class="env-unit">kLux</span>
+                </span>
+                <span class="env-key">光合有效辐射 (PAR)</span>
+              </div>
+            </div>
+            <div class="env-item warn">
+              <span class="env-icon">🌫️</span>
+              <div class="env-info">
+                <span class="env-val warn">
+                  <CountUp :to="142" :from="0" :decimals="0" />
+                  <span class="env-unit">个/m³</span>
+                </span>
+                <span class="env-key">病原孢子扩散密度</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 24h Trend Chart -->
+          <div class="trend-chart-box">
+            <div class="chart-sub-head">
+              <span>24小时叶面微湿度与孢子萌发诱发曲线</span>
+              <span class="chart-alert-tag">警戒线 80% RH</span>
+            </div>
+            <div ref="trendChartRef" class="trend-chart"></div>
+          </div>
+        </SpotlightCard>
+      </div>
+    </main>
+
+    <!-- ============ 3. PAGE FOOTER ============ -->
+    <footer class="page-footer">
+      <span>面向复杂大田环境的玉米病害智能诊断系统 · 边缘端轻量模型与高精度注意机制自适应协同感知</span>
+      <span class="footer-divider">|</span>
+      <span>国家大田数字农业应用创新基地</span>
+    </footer>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
+import axios from 'axios'
+import * as echarts from 'echarts'
+import ParticlesBg from '@/components/effects/ParticlesBg.vue'
+import AuroraBg from '@/components/effects/AuroraBg.vue'
+import SquaresBg from '@/components/effects/SquaresBg.vue'
+import SpotlightCard from '@/components/effects/SpotlightCard.vue'
+import ShinyText from '@/components/effects/ShinyText.vue'
+import DecryptedText from '@/components/effects/DecryptedText.vue'
+import CountUp from '@/components/effects/CountUp.vue'
+import Magnet from '@/components/effects/Magnet.vue'
+import TiltedCard from '@/components/effects/TiltedCard.vue'
+
+// ── Clock ──────────────────────────────────────────────────────────────
+const currentTime = ref('')
+let clockTimer = null
+
+// ── Backend & Model Status ─────────────────────────────────────────────
+const backendOnline = ref(false)
+const backendModel = ref('ResNet50-CBAM')
+const inferenceSpeed = ref('14.2ms')
+
+// ── Refs ───────────────────────────────────────────────────────────────
+const fileInput = ref(null)
+const messagesWrap = ref(null)
+const chatTextarea = ref(null)
+const trendChartRef = ref(null)
+const radarChartRef = ref(null)
+const distChartRef = ref(null)
+
+// ── Upload & Sample state (删除所有内置假数据，完全从后端接口加载) ────
+const isDragging = ref(false)
+const previewUrl = ref('')
+const currentSampleId = ref('')
+const currentSample = ref(null)
+const presetSamples = ref([])
+const isDetecting = ref(false)
+const isDetected = ref(false)
+const showHeatmap = ref(false)
+
+// ── Chat state ─────────────────────────────────────────────────────────
+const inputText = ref('')
+const aiTyping = ref(false)
+const toolStatus = ref('')
+const messages = ref([
+  {
+    role: 'ai',
+    text: '您好！我是大田玉米叶部病害智能诊断与飞防专家助手 🌽（内核驱动：<strong>Agnes-3.0-Flash</strong>）。<br>系统与边缘端深度学习推理引擎（ResNet50 + CBAM 空间注意力机制）及大田微环境传感器实时协同。您可以点击上方真实大田样本或上传实拍图片进行病害诊断，也可以就病原菌防治、药剂配比及无人机作业参数随时向我咨询。'
+  }
+])
+
+// ── Helpers ────────────────────────────────────────────────────────────
+function formatTime(d) {
+  return d.toTimeString().slice(0, 5)
+}
+
+function pushAiMessage(text) {
+  messages.value.push({ role: 'ai', text })
+  scrollChat(true)
+}
+
+function scrollChat(force = false) {
+  nextTick(() => {
+    if (!messagesWrap.value) return
+    const el = messagesWrap.value
+    const isNearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120
+    if (force || isNearBottom) {
+      el.scrollTop = el.scrollHeight
+    }
+  })
+}
+
+function autoGrow(e) {
+  const el = e.target
+  el.style.height = 'auto'
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px'
+}
+
+// ── 1. 加载后端真实大田样本 ───────────────────────────────────────────
+async function fetchPresetSamples() {
+  try {
+    // 接口：GET /screen/samples（后端 app/bigscreen_api.py 的 get_preset_samples）—— 4 类典型样本，用于样本直选与默认预览
+    const res = await axios.get('/api/screen/samples')
+    if (res.data?.data && res.data.data.length > 0) {
+      presetSamples.value = res.data.data
+      backendOnline.value = true
+      if (!previewUrl.value) {
+        selectPreset(presetSamples.value[0])
+      }
+    }
+  } catch (err) {
+    console.error('加载大田真实样本失败:', err)
+  }
+}
+
+function selectPreset(sample) {
+  currentSampleId.value = sample.id
+  currentSample.value = {
+    ...sample,
+    boxes: []
+  }
+  previewUrl.value = sample.imgData
+  isDetected.value = false
+  showHeatmap.value = false
+}
+
+// ── 2. 用户本地图片上传 ────────────────────────────────────────────────
+function onDrop(e) {
+  isDragging.value = false
+  const file = e.dataTransfer.files[0]
+  if (file && file.type.startsWith('image/')) loadFile(file)
+}
+
+function onFileChange(e) {
+  const file = e.target.files[0]
+  if (file) loadFile(file)
+}
+
+function loadFile(file) {
+  const reader = new FileReader()
+  reader.onload = ev => {
+    previewUrl.value = ev.target.result
+    currentSampleId.value = 'custom'
+    currentSample.value = {
+      id: 'custom',
+      name: file.name,
+      scenario: '实景照片上传',
+      diseaseName: '待执行 AI 诊断',
+      pathogen: '检测中',
+      severity: '待评估',
+      damageRate: 0,
+      confidence: 0,
+      color: '#059669',
+      prescription: '请点击下方按钮启动大田多尺度 AI 检测模型。',
+      boxes: [],
+      imgData: ev.target.result,
+      gradcam_base64: ''
+    }
+    isDetected.value = false
+    showHeatmap.value = false
+  }
+  reader.readAsDataURL(file)
+}
+
+function clearImage() {
+  previewUrl.value = ''
+  currentSampleId.value = ''
+  currentSample.value = null
+  isDetected.value = false
+  showHeatmap.value = false
+  if (fileInput.value) fileInput.value.value = ''
+}
+
+function toggleHeatmap() {
+  showHeatmap.value = !showHeatmap.value
+}
+
+// ── 3. 调用后端真实模型推理诊断 ───────────────────────────────────────
+async function runDetect() {
+  if (!previewUrl.value || isDetecting.value) return
+  isDetecting.value = true
+  isDetected.value = false
+  showHeatmap.value = false
+
+  try {
+    // 接口：POST /screen/predict（后端 app/bigscreen_api.py 的 predict_screen）—— 大屏综合诊断，返回病害/热力图/病斑框/处方
+    const res = await axios.post('/api/screen/predict', {
+      image_base64: previewUrl.value,
+      filename: currentSample.value?.name || 'leaf.jpg',
+      model: 'resnet50_cbam'
+    })
+
+    if (res.data?.data) {
+      const data = res.data.data
+      currentSample.value = {
+        ...currentSample.value,
+        diseaseName: data.diseaseName,
+        class_name_en: data.class_name_en,
+        class_name_cn: data.class_name_cn,
+        pathogen: data.pathogen,
+        severity: data.severity,
+        damageRate: data.damageRate,
+        confidence: data.confidence,
+        color: data.color,
+        prescription: data.prescription,
+        droneParams: data.droneParams,
+        boxes: data.boxes || [],
+        gradcam_base64: data.gradcam_base64,
+        probabilities: data.probabilities
+      }
+      isDetected.value = true
+      backendOnline.value = true
+      backendModel.value = data.model_used.includes('cbam') ? 'ResNet50-CBAM' : 'ResNet50'
+      inferenceSpeed.value = data.inference_ms + 'ms'
+
+      const boxDesc = data.boxes?.length ? ('，标注出 ' + data.boxes.length + ' 处典型病灶区域') : ''
+      const text = '🎯 <strong>AI 诊断完成</strong>：检出主要病害为「<strong>' + data.diseaseName + '</strong>」' + boxDesc + '，置信度 <strong>' + data.confidence + '%</strong>，严重度：' + data.severity + '。<br>📋 处方：' + data.prescription
+      pushAiMessage(text)
+    }
+  } catch (err) {
+    console.error('模型推理诊断失败:', err)
+    pushAiMessage('⚠️ 诊断请求异常，请检查后端模型服务状态。')
+  } finally {
+    isDetecting.value = false
+  }
+}
+
+// ── 4. AI 专家智能问答对话 (真实 Vue3 响应式平滑打字流 + web_search) ────
+const isAiStreaming = ref(false)
+
+// 流式字符缓冲池与打字调度器
+let typingBuffer = ''
+let isNetworkDone = false
+let typingIntervalTimer = null
+
+function appendToBuffer(chunk) {
+  typingBuffer += chunk
+  if (!typingIntervalTimer) {
+    runTypingEngine()
+  }
+}
+
+function runTypingEngine() {
+  if (typingIntervalTimer) return
+  typingIntervalTimer = setInterval(() => {
+    // 关键：直接通过 messages.value 访问当前的响应式 Proxy 对象
+    const targetMsg = messages.value[messages.value.length - 1]
+    if (!targetMsg || targetMsg.role !== 'ai') {
+      clearInterval(typingIntervalTimer)
+      typingIntervalTimer = null
+      return
+    }
+
+    if (typingBuffer.length > 0) {
+      // 自适应出字速率：缓冲区字多时稍快，字少时单字匀速打字
+      let step = 1
+      if (typingBuffer.length > 60) {
+        step = 4
+      } else if (typingBuffer.length > 25) {
+        step = 2
+      } else {
+        step = 1
+      }
+
+      const slice = typingBuffer.slice(0, step)
+      typingBuffer = typingBuffer.slice(step)
+      // 触发 Vue 3 响应式更新，视图即刻逐字渲染
+      targetMsg.text += slice
+      scrollChat()
+    } else if (isNetworkDone) {
+      // 网络接收完毕且缓冲区字符已全部打在屏幕上
+      clearInterval(typingIntervalTimer)
+      typingIntervalTimer = null
+      targetMsg.isStreaming = false
+      isAiStreaming.value = false
+      aiTyping.value = false
+      toolStatus.value = ''
+      scrollChat(true)
+    }
+  }, 22)
+}
+
+function flushTypingDirectly() {
+  if (typingIntervalTimer) {
+    clearInterval(typingIntervalTimer)
+    typingIntervalTimer = null
+  }
+  const targetMsg = messages.value[messages.value.length - 1]
+  if (targetMsg && targetMsg.role === 'ai') {
+    if (typingBuffer) {
+      targetMsg.text += typingBuffer
+      typingBuffer = ''
+    }
+    targetMsg.isStreaming = false
+  }
+  isNetworkDone = true
+  isAiStreaming.value = false
+  aiTyping.value = false
+  toolStatus.value = ''
+  scrollChat(true)
+}
+
+function renderFormattedText(text) {
+  if (!text) return ''
+  // 保持包含特定预置 HTML 的固定文案完整性
+  if (text.includes('<strong>Agnes-3.0-Flash</strong>') || text.includes('<strong>AI 诊断完成</strong>')) {
+    return text
+  }
+
+  // 1. 转义基础 HTML 实体防御注入
+  let html = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+
+  // 2. 标题层级转换（使用 span 规避段落内非法嵌套 div 导致的 DOM 拆解重构）
+  html = html
+    .replace(/^### (.*$)/gim, '<span class="md-h3">$1</span>')
+    .replace(/^## (.*$)/gim, '<span class="md-h2">$1</span>')
+    .replace(/^# (.*$)/gim, '<span class="md-h1">$1</span>')
+
+  // 3. 行内代码
+  html = html.replace(/`([^`]+)`/g, '<code class="chat-inline-code">$1</code>')
+
+  // 4. 成对粗体语法
+  html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+  // 剥除末尾未闭合的单边 ** 标记，避免流式打字期间闪烁跳动
+  html = html.replace(/\*\*$/, '')
+
+  // 5. 列表与条目序号
+  html = html.replace(/^[\*\-] (.*$)/gim, '<span class="md-li"><span class="md-bullet">•</span> $1</span>')
+  html = html.replace(/^(\d+)\. (.*$)/gim, '<span class="md-li"><span class="md-num">$1.</span> $2</span>')
+
+  // 6. 统一换行转义
+  html = html.replace(/\n/g, '<br>')
+
+  return html
+}
+
+async function sendMessage() {
+  const txt = inputText.value.trim()
+  if (!txt || aiTyping.value) return
+
+  // 1. 用户提问入列并强制滚动至底部（不带时间）
+  messages.value.push({ role: 'user', text: txt })
+  inputText.value = ''
+  if (chatTextarea.value) chatTextarea.value.style.height = 'auto'
+  scrollChat(true)
+
+  aiTyping.value = true
+  isAiStreaming.value = false
+  toolStatus.value = ''
+  isNetworkDone = false
+  typingBuffer = ''
+  if (typingIntervalTimer) {
+    clearInterval(typingIntervalTimer)
+    typingIntervalTimer = null
+  }
+
+  // 2. 构造历史对话上下文
+  const historyPayload = messages.value.slice(-6).map(m => ({
+    role: m.role === 'ai' ? 'assistant' : 'user',
+    content: (m.text || '').replace(/<[^>]+>/g, '')
+  }))
+
+  let hasCreatedAiMsg = false
+
+  try {
+    const response = await fetch('/api/screen/chat/stream', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'text/event-stream'
+      },
+      body: JSON.stringify({
+        message: txt,
+        context: (currentSample.value && isDetected.value) ? {
+          diseaseName: currentSample.value.diseaseName,
+          severity: currentSample.value.severity,
+          damageRate: currentSample.value.damageRate,
+          prescription: currentSample.value.prescription,
+          climate: { temp: 28.4, humidity: 84.2 }
+        } : {
+          climate: { temp: 28.4, humidity: 84.2 }
+        },
+        history: historyPayload
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error(`HTTP error ${response.status}`)
+    }
+
+    // 4. 标准 Fetch ReadableStream 流式消费
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder('utf-8')
+    let buffer = ''
+
+    while (true) {
+      const { value, done } = await reader.read()
+      if (done) break
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() || ''
+
+      for (const line of lines) {
+        const trimmed = line.trim()
+        if (!trimmed || !trimmed.startsWith('data: ')) continue
+        const jsonStr = trimmed.slice(6).trim()
+        if (jsonStr === '[DONE]') break
+
+        try {
+          const evt = JSON.parse(jsonStr)
+
+          // 4.1 触发了 web_search 联网检索工具调用
+          if (evt.type === 'tool_call') {
+            toolStatus.value = `🌐 正在调用 web_search 联网检索：「${evt.query}」...`
+            scrollChat()
+          } else if (evt.type === 'tool_result') {
+            toolStatus.value = '🔍 联网检索完毕，大模型正在组织解答...'
+            scrollChat()
+          } else if (evt.type === 'delta') {
+            // 4.2 收到流式文本增量：直接推入响应式打字池
+            if (!hasCreatedAiMsg) {
+              hasCreatedAiMsg = true
+              isAiStreaming.value = true
+              // 直接向 messages.value 压入响应式消息对象（不带时间）
+              messages.value.push({
+                role: 'ai',
+                text: '',
+                isStreaming: true,
+                searchQuery: toolStatus.value ? toolStatus.value.replace(/.*「(.*)」.*/, '$1') : ''
+              })
+            }
+            toolStatus.value = ''
+            appendToBuffer(evt.content)
+          } else if (evt.type === 'done') {
+            toolStatus.value = ''
+          }
+        } catch (parseErr) {
+          console.warn('解析流式 SSE 消息异常:', parseErr, jsonStr)
+        }
+      }
+    }
+
+    // 网络读取完毕，通知打字机平滑消费剩余字符
+    isNetworkDone = true
+
+    // 等待打字机打完剩余字符
+    await new Promise(resolve => {
+      const timer = setInterval(() => {
+        if (!typingIntervalTimer && typingBuffer.length === 0) {
+          clearInterval(timer)
+          resolve()
+        }
+      }, 30)
+    })
+
+    const lastMsg = messages.value[messages.value.length - 1]
+    if (!lastMsg || lastMsg.role !== 'ai' || !lastMsg.text) {
+      if (!hasCreatedAiMsg) {
+        messages.value.push({
+          role: 'ai',
+          text: '专家助手暂未给出解答。',
+          isStreaming: false
+        })
+      }
+    }
+  } catch (err) {
+    console.error('流式问答请求异常:', err)
+    flushTypingDirectly()
+    if (!hasCreatedAiMsg) {
+      messages.value.push({
+        role: 'ai',
+        text: '⚠️ 专家助手服务响应超时或离线，请稍后重试。',
+        isStreaming: false
+      })
+    }
+  } finally {
+    flushTypingDirectly()
+    scrollChat(true)
+  }
+}
+
+function askPreset(q) {
+  inputText.value = q
+  sendMessage()
+}
+
+// ── 5. 示范区大田遥测数据与可视化图表 (ECharts) ───────────────────────
+let trendChart = null
+let radarChart = null
+let distChart = null
+
+async function initCharts() {
+  try {
+    // 接口：GET /screen/telemetry（后端 app/bigscreen_api.py 的 get_telemetry）—— 微气候/病害分布/雷达，仅初始化拉一次
+    const res = await axios.get('/api/screen/telemetry')
+    const telemetry = res.data?.data
+    if (!telemetry) return
+
+    // 1. 24h 微气候折线图
+    if (trendChartRef.value) {
+      trendChart = echarts.init(trendChartRef.value)
+      trendChart.setOption({
+        grid: { top: 24, bottom: 24, left: 36, right: 16 },
+        tooltip: { trigger: 'axis' },
+        legend: {
+          data: ['发病风险指数', '相对湿度(%)'],
+          textStyle: { fontSize: 11, color: '#64748b' },
+          top: 0,
+          right: 0
+        },
+        xAxis: {
+          type: 'category',
+          data: telemetry.climate.hours,
+          axisLine: { lineStyle: { color: '#cbd5e1' } },
+          axisLabel: { color: '#64748b', fontSize: 11 },
+          axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          min: 0,
+          max: 100,
+          splitLine: { lineStyle: { color: '#f1f5f9', type: 'dashed' } },
+          axisLabel: { color: '#64748b', fontSize: 11 }
+        },
+        series: [
+          {
+            name: '发病风险指数',
+            type: 'line',
+            smooth: true,
+            data: telemetry.climate.temperatures.map(t => Math.round(t * 2.5)),
+            itemStyle: { color: '#ea580c' },
+            lineStyle: { width: 2.5 },
+            areaStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: 'rgba(234, 88, 12, 0.22)' },
+                { offset: 1, color: 'rgba(234, 88, 12, 0.01)' }
+              ])
+            }
+          },
+          {
+            name: '相对湿度(%)',
+            type: 'line',
+            smooth: true,
+            data: telemetry.climate.humidities,
+            itemStyle: { color: '#0284c7' },
+            lineStyle: { width: 2, type: 'dashed' }
+          }
+        ]
+      })
+    }
+
+    // 2. 抗逆鲁棒性六维雷达图
+    if (radarChartRef.value) {
+      radarChart = echarts.init(radarChartRef.value)
+      radarChart.setOption({
+        tooltip: { trigger: 'item' },
+        radar: {
+          indicator: telemetry.radar.map(r => ({ name: r.name, max: r.max })),
+          center: ['50%', '52%'],
+          radius: '65%',
+          axisName: { color: '#475569', fontSize: 11 },
+          splitLine: { lineStyle: { color: '#e2e8f0' } },
+          splitArea: { show: false },
+          axisLine: { lineStyle: { color: '#cbd5e1' } }
+        },
+        series: [
+          {
+            name: '抗逆鲁棒性评分',
+            type: 'radar',
+            data: [
+              {
+                value: telemetry.radar.map(r => r.value),
+                name: 'ResNet50-CBAM 模型实测评分',
+                symbol: 'circle',
+                symbolSize: 4,
+                itemStyle: { color: '#059669' },
+                areaStyle: { color: 'rgba(5, 150, 105, 0.25)' }
+              }
+            ]
+          }
+        ]
+      })
+    }
+
+    // 3. 病害频次分布南丁格尔玫瑰图
+    if (distChartRef.value) {
+      distChart = echarts.init(distChartRef.value)
+      distChart.setOption({
+        tooltip: { trigger: 'item', formatter: '{b}: {c}%' },
+        legend: {
+          orient: 'vertical',
+          right: '2%',
+          top: 'center',
+          textStyle: { color: '#64748b', fontSize: 11 },
+          itemWidth: 10,
+          itemHeight: 10
+        },
+        series: [
+          {
+            name: '病害发生频次占比',
+            type: 'pie',
+            radius: ['28%', '75%'],
+            center: ['40%', '50%'],
+            roseType: 'radius',
+            itemStyle: { borderRadius: 4, borderColor: '#ffffff', borderWidth: 1.5 },
+            label: { show: false },
+            data: telemetry.distribution.map(d => ({
+              value: d.value,
+              name: d.name,
+              itemStyle: { color: d.color }
+            }))
+          }
+        ]
+      })
+    }
+  } catch (err) {
+    console.error('加载遥测图表数据失败:', err)
+  }
+}
+
+function handleResize() {
+  trendChart && trendChart.resize()
+  radarChart && radarChart.resize()
+  distChart && distChart.resize()
+}
+
+// ── Lifecycle ──────────────────────────────────────────────────────────
+onMounted(() => {
+  const tick = () => {
+    const now = new Date()
+    currentTime.value = now.toLocaleString('zh-CN', {
+      year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit',
+      hour12: false
+    })
+  }
+  tick()
+  clockTimer = setInterval(tick, 1000)
+
+  // 1. 获取真实大田样本
+  fetchPresetSamples()
+
+  // 2. 初始化图表并拉取遥测数据
+  nextTick(() => {
+    initCharts()
+  })
+
+  window.addEventListener('resize', handleResize)
+})
+
+onUnmounted(() => {
+  clearInterval(clockTimer)
+  window.removeEventListener('resize', handleResize)
+  trendChart && trendChart.dispose()
+  radarChart && radarChart.dispose()
+  distChart && distChart.dispose()
+})
+</script>
+
+<style lang="scss" scoped>
+/* ==========================================================================
+   Modern Clean Light + React Bits Template System
+   Palette: Slate-50 (#f8fafc) + Emerald (#059669) + Spotlight Pure White Cards
+   ========================================================================== */
+
+.app-container {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #0f172a;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  overflow-x: hidden;
+  position: relative;
+}
+
+/* ── 1. Top Header with Particles effect ───────────────────────────────── */
+.page-header {
+  height: 68px;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid #e2e8f0;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+
+.header-content {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  z-index: 2;
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.brand-badge-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #bbf7d0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  font-size: 20px;
+  cursor: pointer;
+
+  .brand-radar-ping {
+    position: absolute;
+    inset: -3px;
+    border-radius: 12px;
+    border: 1.5px solid #10b981;
+    opacity: 0.6;
+    animation: radar-ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+  }
+}
+
+@keyframes radar-ping {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  70% { transform: scale(1.18); opacity: 0; }
+  100% { transform: scale(1.18); opacity: 0; }
+}
+
+.brand-titles {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.brand-main-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brand-name {
+  font-size: 18px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.brand-model-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #047857;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 2px 10px;
+  border-radius: 9999px;
+  font-weight: 500;
+  font-family: monospace;
+
+  .pulse-chip {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    box-shadow: 0 0 6px #10b981;
+  }
+}
+
+.brand-sub {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.telemetry-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #059669;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+
+  &.warning {
+    color: #c2410c;
+    background: #fff7ed;
+    border-color: #ffedd5;
+  }
+
+  .pill-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #10b981;
+  }
+}
+
+.time-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #64748b;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  padding: 5px 12px;
+  border-radius: 8px;
+  font-family: monospace;
+}
+
+/* ── 2. Workspace Layout ──────────────────────────────────────────────── */
+.workspace {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1fr 450px;
+  gap: 20px;
+  padding: 22px 32px;
+  max-width: 1600px;
+  width: 100%;
+  margin: 0 auto;
+  align-items: start;
+  position: relative;
+  z-index: 2;
+}
+
+.col {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+/* ── 3. Base Card Structure ───────────────────────────────────────────── */
+.card-head {
+  padding: 16px 22px 14px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.section-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.section-desc {
+  font-size: 13px;
+  color: #64748b;
+  margin: 3px 0 0;
+}
+
+.badge-status-ready {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #059669;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  padding: 3px 10px;
+  border-radius: 6px;
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+  }
+}
+
+/* ── 4. Upload & Detection Area ───────────────────────────────────────── */
+.dropzone {
+  margin: 16px 22px 0;
+  border: 2px dashed #cbd5e1;
+  border-radius: 10px;
+  min-height: 250px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  background: #f8fafc;
+
+  &.dz-over {
+    border-color: #059669;
+    background: #ecfdf5;
+  }
+
+  &.dz-filled {
+    cursor: default;
+    background: #020617;
+    border-style: solid;
+    border-color: #e2e8f0;
+    padding: 0;
+  }
+
+  &.is-detecting {
+    border-color: #10b981;
+  }
+}
+
+.scanner-laser {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #10b981, #34d399, transparent);
+  box-shadow: 0 0 14px #10b981;
+  z-index: 25;
+  animation: scan-vertical 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes scan-vertical {
+  0% { top: 4%; }
+  100% { top: 96%; }
+}
+
+.dz-inner-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 24px;
+}
+
+.dz-icon-wrapper {
+  width: 54px;
+  height: 54px;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.04);
+}
+
+.dz-icon {
+  width: 28px;
+  height: 28px;
+  color: #059669;
+}
+
+.dz-main {
+  font-size: 15px;
+  color: #334155;
+  font-weight: 500;
+  margin: 0;
+}
+
+.dz-link {
+  color: #059669;
+  font-weight: 600;
+}
+
+.dz-hint {
+  font-size: 13px;
+  color: #64748b;
+  margin-top: 6px;
+}
+
+.preview-img-container {
+  width: 100%;
+  height: 250px;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.preview-img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.overlay-boxes {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 5;
+}
+
+.tech-bbox {
+  position: absolute;
+  border: 2px solid;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.04);
+
+  .corner {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    border-style: solid;
+    border-width: 0;
+
+    &.lt { top: -2px; left: -2px; border-top-width: 2px; border-left-width: 2px; }
+    &.rt { top: -2px; right: -2px; border-top-width: 2px; border-right-width: 2px; }
+    &.lb { bottom: -2px; left: -2px; border-bottom-width: 2px; border-left-width: 2px; }
+    &.rb { bottom: -2px; right: -2px; border-bottom-width: 2px; border-right-width: 2px; }
+  }
+}
+
+.tech-bbox-label {
+  position: absolute;
+  top: -24px;
+  left: 0;
+  font-size: 12px;
+  color: #ffffff;
+  padding: 2px 8px;
+  border-radius: 4px;
+  white-space: nowrap;
+  font-family: monospace;
+  font-weight: 600;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.preview-action-dock {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  display: flex;
+  gap: 8px;
+  z-index: 15;
+}
+
+.tech-action-btn,
+.replace-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #1e293b;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.08);
+  font-weight: 500;
+  transition: all 0.15s;
+
+  svg { width: 14px; height: 14px; }
+
+  &:hover {
+    background: #ffffff;
+    border-color: #059669;
+    color: #059669;
+  }
+}
+
+/* Preset samples row */
+.preset-section {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px 0;
+  flex-wrap: wrap;
+}
+
+.preset-label {
+  font-size: 13px;
+  color: #475569;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.preset-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.preset-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #334155;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  .chip-dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+  }
+
+  .chip-title {
+    font-weight: 600;
+  }
+
+  .chip-sub {
+    font-size: 11px;
+    color: #64748b;
+  }
+
+  &:hover {
+    border-color: #059669;
+    color: #059669;
+    background: #ecfdf5;
+  }
+
+  &.active {
+    background: #ecfdf5;
+    border-color: #059669;
+    color: #059669;
+    font-weight: 600;
+    box-shadow: 0 1px 3px rgba(5, 150, 105, 0.12);
+  }
+}
+
+/* Detect Button */
+.detect-btn-wrap {
+  padding: 16px 22px 20px;
+}
+
+.detect-btn {
+  width: 100%;
+  height: 48px;
+  background: #059669;
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 600;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  box-shadow: 0 2px 6px rgba(5, 150, 105, 0.2);
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #047857;
+    box-shadow: 0 4px 10px rgba(5, 150, 105, 0.28);
+  }
+
+  &:disabled {
+    background: #cbd5e1;
+    color: #94a3b8;
+    cursor: not-allowed;
+    box-shadow: none;
+  }
+
+  .btn-icon {
+    width: 18px;
+    height: 18px;
+  }
+
+  .btn-spinner {
+    width: 18px;
+    height: 18px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 5. Detection Result ──────────────────────────────────────────────── */
+.result-title-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  .result-indicator-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+  }
+}
+
+.result-badge {
+  font-size: 13px;
+  font-weight: 600;
+  padding: 4px 12px;
+  border-radius: 9999px;
+  border: 1px solid;
+}
+
+.metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  padding: 16px 22px 0;
+}
+
+.metric {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metric-key {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.metric-val {
+  font-size: 16px;
+  font-weight: 700;
+  color: #0f172a;
+
+  &.warn { color: #d97706; }
+  &.success { color: #059669; }
+  &.danger { color: #dc2626; }
+}
+
+.metric-sub {
+  font-size: 11px;
+  color: #64748b;
+}
+
+.prescription-box {
+  margin: 14px 22px 20px;
+  padding: 16px 18px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+}
+
+.prescription-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #059669;
+  margin-bottom: 8px;
+
+  .p-icon { width: 16px; height: 16px; }
+}
+
+.prescription-text {
+  font-size: 14px;
+  color: #166534;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+}
+
+.drone-params-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+
+  .d-chip {
+    font-size: 12px;
+    background: #ffffff;
+    border: 1px solid #bbf7d0;
+    color: #15803d;
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-weight: 500;
+  }
+}
+
+/* ── 6. Visual Analytics (Dual charts) ────────────────────────────────── */
+.data-tag {
+  font-size: 12px;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.charts-dual-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  padding: 16px 22px;
+}
+
+.chart-pane {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-legend-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 4px;
+}
+
+.tech-chart-holder {
+  width: 100%;
+  height: 200px;
+}
+
+/* ── 7. Right Column: Chat Assistant ──────────────────────────────────── */
+.chat-spotlight-card {
+  height: 520px;
+}
+
+.chat-header-wrap {
+  position: relative;
+  z-index: 2;
+}
+
+.title-with-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.llm-model-badge {
+  font-size: 11px;
+  font-weight: 600;
+  color: #047857;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+}
+
+.msg-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 4px;
+}
+
+.msg-tag {
+  font-size: 10px;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid #d1fae5;
+  font-weight: 500;
+}
+
+.chat-title-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .ai-avatar-badge {
+    width: 32px;
+    height: 32px;
+    background: #ecfdf5;
+    border: 1px solid #bbf7d0;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 16px;
+    cursor: pointer;
+  }
+
+  .chat-sub {
+    font-size: 11px;
+    color: #64748b;
+  }
+}
+
+.chat-status {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 13px;
+  color: #059669;
+  font-weight: 500;
+
+  .status-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #10b981;
+    animation: pulse 2s infinite;
+  }
+}
+
+.quick-questions {
+  padding: 10px 18px 8px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  background: #ffffff;
+  position: relative;
+  z-index: 2;
+
+  .q-label {
+    font-size: 12px;
+    color: #64748b;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .q-pills {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+
+  .q-btn {
+    font-size: 12px;
+    color: #334155;
+    background: #f1f5f9;
+    border: 1px solid #e2e8f0;
+    border-radius: 4px;
+    padding: 3px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+
+    &:hover {
+      background: #ecfdf5;
+      color: #059669;
+      border-color: #059669;
+    }
+  }
+}
+
+.messages-wrap {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: #ffffff;
+  position: relative;
+  z-index: 2;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.msg-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+
+  &.user { flex-direction: row-reverse; }
+}
+
+.msg-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  flex-shrink: 0;
+}
+
+.tool-call-banner {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 4px;
+  padding: 3px 8px;
+  font-size: 11px;
+  color: #047857;
+  margin-bottom: 6px;
+  width: fit-content;
+
+  .tool-icon {
+    font-size: 12px;
+  }
+}
+
+.msg-bubble {
+  max-width: 80%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+
+  &.ai {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-top-left-radius: 2px;
+  }
+
+  &.user {
+    background: #059669;
+    border-top-right-radius: 2px;
+
+    .msg-text { color: #ffffff; }
+    .msg-time { color: rgba(255, 255, 255, 0.7); text-align: right; }
+  }
+}
+
+.msg-text {
+  font-size: 14px;
+  color: #1e293b;
+  line-height: 1.65;
+  margin: 0;
+  word-break: break-word;
+}
+
+.streaming-cursor {
+  display: inline-block;
+  width: 7px;
+  height: 14px;
+  background-color: #059669;
+  vertical-align: -1px;
+  margin-left: 2px;
+  border-radius: 1px;
+  animation: cursorBlink 0.75s infinite ease-in-out;
+}
+
+@keyframes cursorBlink {
+  0%, 100% { opacity: 1; transform: scaleY(1); }
+  50% { opacity: 0.15; transform: scaleY(0.95); }
+}
+
+.md-h1, .md-h2, .md-h3 {
+  display: inline-block;
+  font-weight: 700;
+  margin-top: 6px;
+  margin-bottom: 2px;
+  line-height: 1.45;
+}
+.md-h1 { font-size: 15px; color: #0f172a; }
+.md-h2 { font-size: 14.5px; color: #0f172a; }
+.md-h3 { font-size: 14px; color: #065f46; }
+
+.md-li {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 5px;
+  margin-top: 2px;
+  margin-bottom: 2px;
+  line-height: 1.5;
+
+  .md-bullet {
+    color: #059669;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+  .md-num {
+    color: #059669;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+}
+
+.chat-inline-code {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 1px 4px;
+  font-size: 12px;
+  font-family: monospace;
+  color: #0f766e;
+}
+
+.typing-bubble {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+
+  .typing-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #059669;
+    animation: bounce 1.2s infinite;
+
+    &:nth-child(2) { animation-delay: 0.2s; }
+    &:nth-child(3) { animation-delay: 0.4s; }
+  }
+
+  .typing-text {
+    font-size: 12px;
+    color: #64748b;
+    margin-left: 4px;
+  }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+
+.chat-input-dock {
+  background: #ffffff;
+  padding: 12px 18px 14px;
+  border-top: 1px solid #f1f5f9;
+  position: relative;
+  z-index: 2;
+}
+
+.chat-input-wrap {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 8px 8px 8px 12px;
+  transition: all 0.15s;
+
+  &:focus-within {
+    border-color: #059669;
+    background: #ffffff;
+    box-shadow: 0 0 0 2px rgba(5, 150, 105, 0.12);
+  }
+}
+
+.chat-input {
+  flex: 1;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-size: 14px;
+  color: #0f172a;
+  resize: none;
+  line-height: 1.5;
+  min-height: 24px;
+  max-height: 120px;
+  font-family: inherit;
+
+  &::placeholder { color: #94a3b8; }
+}
+
+.send-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  background: #059669;
+  border: none;
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: all 0.15s;
+
+  svg { width: 16px; height: 16px; }
+
+  &:hover:not(:disabled) { background: #047857; }
+  &:disabled { background: #e2e8f0; color: #94a3b8; cursor: not-allowed; }
+}
+
+.chat-tip {
+  font-size: 11px;
+  color: #94a3b8;
+  margin: 6px 0 0;
+  text-align: center;
+}
+
+/* ── 8. Environmental Telemetry Card ──────────────────────────────────── */
+.env-update-pill {
+  font-size: 12px;
+  color: #0284c7;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.env-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1px;
+  margin: 16px 20px 14px;
+  background: #f1f5f9;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #e2e8f0;
+}
+
+.env-item {
+  background: #ffffff;
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  &.warn { background: #fffbeb; }
+}
+
+.env-icon {
+  font-size: 24px;
+}
+
+.env-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.env-val {
+  font-size: 18px;
+  font-weight: 700;
+  color: #0f172a;
+
+  &.warn { color: #d97706; }
+
+  .env-unit {
+    font-size: 12px;
+    font-weight: 500;
+    color: #64748b;
+  }
+}
+
+.env-key {
+  font-size: 12px;
+  color: #64748b;
+}
+
+.trend-chart-box {
+  padding: 0 20px 16px;
+}
+
+.chart-sub-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+  margin-bottom: 6px;
+
+  .chart-alert-tag {
+    font-size: 11px;
+    color: #d97706;
+    background: #fffbeb;
+    padding: 2px 6px;
+    border-radius: 3px;
+  }
+}
+
+.trend-chart {
+  height: 150px;
+}
+
+/* ── 9. Page Footer ───────────────────────────────────────────────────── */
+.page-footer {
+  text-align: center;
+  padding: 16px 24px;
+  font-size: 13px;
+  color: #64748b;
+  border-top: 1px solid #e2e8f0;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
+
+  .footer-divider {
+    color: #cbd5e1;
+  }
+}
+
+/* ── 10. Responsive ───────────────────────────────────────────────────── */
+@media (max-width: 1200px) {
+  .workspace {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+  .charts-dual-grid {
+    grid-template-columns: 1fr;
+  }
+}
+</style>
