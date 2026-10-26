@@ -21,7 +21,7 @@ from PIL import Image
 
 from src.config import load_config
 from src import session_store
-from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge
+from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge, get_prescription
 from src.llm_client import ask_agnes, clear_session, stream_ask_agnes
 
 logger = logging.getLogger("corn_system.bigscreen_api")
@@ -343,12 +343,12 @@ async def predict_screen(req: Base64PredictRequest):
     drone_params = get_drone_params(class_en, severity)
 
     # 推荐药剂与防治指导建议
-    control = kb.get("control", {})
-    chemicals = control.get("chemical", ["及时选用高效低毒对路杀菌剂实施飞防。"])
-    chem_txt = chemicals[0] if isinstance(chemicals, list) and chemicals else "对路高效杀菌剂"
-    prescription = f"选用 {chem_txt}，利用大田植保无人机实施傍晚超低空变量精准喷雾。"
+    # 从结构化处方取药剂，不能直接取 control["chemical"][0]（那是「施药时机」句，
+    # 拼进「选用 …」模板会变成「选用 发病初期（…）及时施药。，利用…」）
     if class_en == "Healthy":
         prescription = "叶色浓绿无病斑，光合机构完整，建议保持常规滴灌水肥一体化管理并加强日常田间监测。"
+    else:
+        prescription = get_prescription(class_en)["sentence"]
 
     result = {
         "diseaseName": f"{class_cn} ({kb.get('name_en', class_en)})",

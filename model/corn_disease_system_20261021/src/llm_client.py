@@ -27,7 +27,7 @@ from datetime import datetime
 from typing import Any, AsyncGenerator, Callable, Dict, List, Optional
 import httpx
 
-from src.knowledge_base import get_knowledge
+from src.knowledge_base import get_knowledge, get_prescription
 from src.web_search import web_search
 from src import session_store
 
@@ -566,7 +566,7 @@ def fallback_expert_reply(msg: str, context: Optional[Dict[str, Any]] = None) ->
     if "大斑病" in msg or ("大斑" in msg and "玉米" in msg):
         kb = get_knowledge("Blight")
         symp = kb["symptoms"][0] if kb.get("symptoms") else "长梭形灰褐色大斑"
-        chem = kb["control"]["chemical"][1] if kb.get("control", {}).get("chemical") else "苯醚甲环唑/嘧菌酯"
+        chem = get_prescription("Blight")["drugs_text"] or "苯醚甲环唑/嘧菌酯"
         return (
             f"【玉米大斑病专家防治指导】\n"
             f"• 病原特征：{kb['pathogen']}。\n"
@@ -577,7 +577,7 @@ def fallback_expert_reply(msg: str, context: Optional[Dict[str, Any]] = None) ->
     elif "锈病" in msg or "南方锈病" in msg or "普通锈病" in msg:
         kb = get_knowledge("Common_Rust")
         symp = kb["symptoms"][0] if kb.get("symptoms") else "两面散生黄褐色夏孢子堆"
-        chem = kb["control"]["chemical"][0] if kb.get("control", {}).get("chemical") else "戊唑醇/苯醚甲环唑"
+        chem = get_prescription("Common_Rust")["drugs_text"] or "戊唑醇/苯醚甲环唑"
         return (
             f"【玉米锈病专家防治指导】\n"
             f"• 病原特征：{kb['pathogen']}。\n"
@@ -588,7 +588,7 @@ def fallback_expert_reply(msg: str, context: Optional[Dict[str, Any]] = None) ->
     elif "灰斑病" in msg or "灰斑" in msg:
         kb = get_knowledge("Gray_Leaf_Spot")
         symp = kb["symptoms"][0] if kb.get("symptoms") else "受叶脉限制的长方形灰褐色病斑"
-        chem = kb["control"]["chemical"][0] if kb.get("control", {}).get("chemical") else "氟硅唑或嘧菌酯"
+        chem = get_prescription("Gray_Leaf_Spot")["drugs_text"] or "氟硅唑或嘧菌酯"
         return (
             f"【玉米灰斑病专家防治指导】\n"
             f"• 病原特征：{kb['pathogen']}。\n"
