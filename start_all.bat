@@ -1,26 +1,33 @@
 @echo off
-title 启动玉米病害智能诊断全栈系统
+rem corn-guardian one-click launcher
+rem   usage: start_all.bat [backend_port]     default 8010
+rem   example: start_all.bat 8020    (when 8010 is already taken by another app)
+
+setlocal
+cd /d "%~dp0"
+set "PORT=%~1"
+if "%PORT%"=="" set "PORT=8010"
+
+title corn-guardian full stack (API %PORT%)
 
 echo =========================================================
-echo   玉米病害多尺度感知与大屏诊断系统 全栈一键启动
-echo   [1] 后端服务: http://localhost:8010
-echo   [2] 前端大屏: http://localhost:5173
-echo   [3] 接口文档: http://localhost:8010/docs
+echo   Corn leaf disease decision console - one click launch
+echo   [1] Backend API : http://127.0.0.1:%PORT%
+echo   [2] Frontend    : http://localhost:5173
+echo   [3] API docs    : http://127.0.0.1:%PORT%/docs
 echo =========================================================
 
-echo 正在启动后端推理引擎服务...
-start "玉米病害-后端服务(8010)" cmd /k "%~dp0run_backend.bat"
+echo Starting backend on port %PORT% ...
+start "corn-guardian-backend-%PORT%" cmd /k run_backend.bat %PORT%
 
-echo 等待后端初始化完成 (3秒)...
-ping 127.0.0.1 -n 4 >nul
+echo Waiting for model warm-up (about 6s) ...
+timeout /t 6 /nobreak >nul
 
-echo 正在启动前端可视化大屏...
-start "玉米病害-前端大屏(5173)" cmd /k "%~dp0run_frontend.bat"
+echo Starting frontend on port 5173 ...
+start "corn-guardian-frontend-5173" cmd /k run_frontend.bat %PORT%
 
-echo 等待前端服务就绪 (2秒)...
-ping 127.0.0.1 -n 3 >nul
+echo Waiting for Vite (about 5s) ...
+timeout /t 5 /nobreak >nul
 
-echo 正在为您打开大屏界面...
-start http://localhost:5173
-
-echo 全栈系统已启动完成！
+start "" http://localhost:5173
+echo All services started.

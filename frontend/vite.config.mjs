@@ -14,7 +14,8 @@ export default defineConfig({
     strictPort: true,
     proxy: {
       '/api': {
-        target: 'http://127.0.0.1:8010',
+        // 默认 8010；若端口被占用可用 VITE_API_TARGET=http://127.0.0.1:8020 npm run dev 覆盖
+        target: process.env.VITE_API_TARGET || 'http://127.0.0.1:8010',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, '')
       }
