@@ -115,8 +115,16 @@
             <h1 class="header-title">玉米叶部病斑多尺度自适应感知与飞防决策系统</h1>
 
             <div class="header-right-tools">
-              <!-- 3 Alert Button (Figma Exact: 110x32, gradient #666 to #1a1a1a, radius 8px) -->
-              <button class="alerts-pill-btn" @click="activeModal = 'alerts'" title="农场告警">
+              <!-- 3 Alert Button (Figma Exact: 110x32, gradient #666 to #1a1a1a, radius 8px)
+                   Magic UI · PulsatingButton — 告警呼吸光环 -->
+              <PulsatingButton
+                class="alerts-pill-btn"
+                pulse-color="rgba(26, 26, 26, 0.28)"
+                duration="2.2s"
+                distance="7px"
+                @click="activeModal = 'alerts'"
+                title="农场告警"
+              >
                 <div class="notif-box">
                   <img src="/tanee/svg/dashboard/icon-7.svg" alt="告警" class="bell-svg"/>
                 </div>
@@ -124,7 +132,7 @@
                 <svg class="arrow-up-right-svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 12L12 4M12 4H6M12 4V10"/>
                 </svg>
-              </button>
+              </PulsatingButton>
 
               <!-- Sector Selector (Figma Exact: text 'Sector:' + pill 'Spinach Garden 08 ▾') -->
               <div class="sector-selector-wrap">
@@ -414,6 +422,9 @@
               <div class="weather-carousel-row">
                 <!-- Weather & Plot Card -->
                 <div class="weather-plot-card" @click="activeModal = 'telemetry'">
+                  <!-- Magic UI · ShineBorder — 卡片边缘流光 -->
+                  <ShineBorder :border-width="1.5" :duration="12" :shine-color="['#8DF3B8', '#17B26A']" />
+
                   <!-- Location & Time Bar -->
                   <div class="wp-top-bar">
                     <div class="wp-loc-tag">
@@ -462,6 +473,9 @@
 
                 <!-- Camera Live Carousel Card (Exact Original) -->
                 <div class="camera-live-box" @mouseenter="pauseCarousel" @mouseleave="resumeCarousel">
+                  <!-- Magic UI · BorderBeam — 实时画面光带 -->
+                  <BorderBeam :size="70" :duration="7" color-from="#8DF3B8" color-to="#35C56E" :border-width="1.5" />
+
                   <!-- 自动轮播画面层（横向滑动切换） -->
                   <div class="cam-carousel-stage">
                     <div
@@ -538,7 +552,20 @@
               <!-- Bottom Row: Metrics Matrix (525.5px × 470px, 2 Rows × 3 Columns) -->
               <div class="metrics-cards-grid">
                 <!-- Card 1: Plant Health (Emerald Green Gradient #35C56E -> #2E9055) -->
-                <div class="metric-card plant-health-card" @click="activeModal = 'telemetry'">
+                <MagicCard
+                  class="metric-card plant-health-card"
+                  background="linear-gradient(135deg, #35c56e 0%, #2e9055 100%)"
+                  gradient-color="#ffffff"
+                  :gradient-opacity="0.22"
+                  gradient-from="#BFF3D5"
+                  gradient-to="#8DF3B8"
+                  border-color="rgba(255, 255, 255, 0.3)"
+                  @click="activeModal = 'telemetry'"
+                >
+                  <template #overlay>
+                    <!-- Magic UI · ShineBorder — 主卡流转高光 -->
+                    <ShineBorder :border-width="1.5" :duration="16" :shine-color="['#ffffff', '#BFF3D5', '#ffffff']" />
+                  </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <img src="/tanee/svg/dashboard/icon-5.svg" alt="Plant Health" class="m-svg-icon white-svg"/>
@@ -552,7 +579,7 @@
                   </div>
                   <div class="m-value-flex">
                     <div class="val-num-unit">
-                      <span class="val-num white-txt">{{ currentSample && isDetected ? Math.max(10, Math.round(100 - currentSample.damageRate)) : 94 }}</span>
+                      <NumberTicker :value="plantHealthValue" class="val-num white-txt" />
                       <span class="val-unit white-txt">%</span>
                     </div>
                     <div class="status-pill-white">
@@ -560,10 +587,19 @@
                     </div>
                   </div>
                   <p class="m-bottom-desc white-txt">作物长势旺盛，健康状态优异</p>
-                </div>
+                </MagicCard>
 
                 <!-- Card 2: Wind (Fills: #FFFFFF) -->
-                <div class="metric-card default-metric-card" @click="activeModal = 'telemetry'">
+                <MagicCard
+                  class="metric-card default-metric-card"
+                  background="#ffffff"
+                  gradient-color="#17B26A"
+                  :gradient-opacity="0.1"
+                  gradient-from="#CBEFDD"
+                  gradient-to="#E6F7EE"
+                  border-color="#F0F1F3"
+                  @click="activeModal = 'telemetry'"
+                >
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <img src="/tanee/svg/dashboard/icon-14.svg" alt="Wind" class="m-svg-icon"/>
@@ -577,15 +613,24 @@
                   </div>
                   <div class="m-value-flex">
                     <div class="val-num-unit">
-                      <span class="val-num dark-txt">2</span>
+                      <NumberTicker :value="2" class="val-num dark-txt" />
                       <span class="val-unit muted-txt">m/s</span>
                     </div>
                   </div>
                   <p class="m-bottom-desc muted-txt">请保持温室内空气充分流通</p>
-                </div>
+                </MagicCard>
 
                 <!-- Card 3: Temperature (Fills: #FFFFFF) -->
-                <div class="metric-card default-metric-card" @click="activeModal = 'telemetry'">
+                <MagicCard
+                  class="metric-card default-metric-card"
+                  background="#ffffff"
+                  gradient-color="#17B26A"
+                  :gradient-opacity="0.1"
+                  gradient-from="#CBEFDD"
+                  gradient-to="#E6F7EE"
+                  border-color="#F0F1F3"
+                  @click="activeModal = 'telemetry'"
+                >
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <img src="/tanee/svg/dashboard/icon-13.svg" alt="Temperature" class="m-svg-icon"/>
@@ -599,15 +644,24 @@
                   </div>
                   <div class="m-value-flex">
                     <div class="val-num-unit">
-                      <span class="val-num dark-txt">19</span>
+                      <NumberTicker :value="19" class="val-num dark-txt" />
                       <span class="val-unit muted-txt">°C</span>
                     </div>
                   </div>
                   <p class="m-bottom-desc muted-txt">建议稳定维持在 15°C 至 20°C</p>
-                </div>
+                </MagicCard>
 
                 <!-- Card 4: pH Level (Fills: #FFFFFF) -->
-                <div class="metric-card default-metric-card" @click="activeModal = 'telemetry'">
+                <MagicCard
+                  class="metric-card default-metric-card"
+                  background="#ffffff"
+                  gradient-color="#17B26A"
+                  :gradient-opacity="0.1"
+                  gradient-from="#CBEFDD"
+                  gradient-to="#E6F7EE"
+                  border-color="#F0F1F3"
+                  @click="activeModal = 'telemetry'"
+                >
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <svg class="m-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
@@ -624,14 +678,23 @@
                   </div>
                   <div class="m-value-flex">
                     <div class="val-num-unit">
-                      <span class="val-num dark-txt">7.6</span>
+                      <NumberTicker :value="7.6" :decimal-places="1" class="val-num dark-txt" />
                     </div>
                   </div>
                   <p class="m-bottom-desc muted-txt">可施加酸性堆肥平衡 pH 值</p>
-                </div>
+                </MagicCard>
 
                 <!-- Card 5: Humidity (Fills: #FFFFFF) -->
-                <div class="metric-card default-metric-card" @click="activeModal = 'telemetry'">
+                <MagicCard
+                  class="metric-card default-metric-card"
+                  background="#ffffff"
+                  gradient-color="#17B26A"
+                  :gradient-opacity="0.1"
+                  gradient-from="#CBEFDD"
+                  gradient-to="#E6F7EE"
+                  border-color="#F0F1F3"
+                  @click="activeModal = 'telemetry'"
+                >
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <svg class="m-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
@@ -647,15 +710,24 @@
                   </div>
                   <div class="m-value-flex">
                     <div class="val-num-unit">
-                      <span class="val-num dark-txt">82</span>
+                      <NumberTicker :value="82" class="val-num dark-txt" />
                       <span class="val-unit muted-txt">%</span>
                     </div>
                   </div>
                   <p class="m-bottom-desc muted-txt">湿度适宜，可有效抑制霉菌滋生</p>
-                </div>
+                </MagicCard>
 
                 <!-- Card 6: Soil Moisture (Fills: #FFFFFF) -->
-                <div class="metric-card default-metric-card" @click="activeModal = 'telemetry'">
+                <MagicCard
+                  class="metric-card default-metric-card"
+                  background="#ffffff"
+                  gradient-color="#17B26A"
+                  :gradient-opacity="0.1"
+                  gradient-from="#CBEFDD"
+                  gradient-to="#E6F7EE"
+                  border-color="#F0F1F3"
+                  @click="activeModal = 'telemetry'"
+                >
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <svg class="m-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
@@ -673,12 +745,12 @@
                   </div>
                   <div class="m-value-flex">
                     <div class="val-num-unit">
-                      <span class="val-num dark-txt">65</span>
+                      <NumberTicker :value="65" class="val-num dark-txt" />
                       <span class="val-unit muted-txt">%</span>
                     </div>
                   </div>
                   <p class="m-bottom-desc muted-txt">请持续监测，保持水分稳定</p>
-                </div>
+                </MagicCard>
               </div>
             </div>
           </div>
@@ -939,6 +1011,13 @@ import gsap from 'gsap'
 import { marked } from 'marked'
 import * as echarts from 'echarts'
 
+// ── Magic UI effects (shadcn registry · @magicui) ─────────────────────
+import MagicCard from '@/components/effects/magicui/MagicCard.vue'
+import NumberTicker from '@/components/effects/magicui/NumberTicker.vue'
+import ShineBorder from '@/components/effects/magicui/ShineBorder.vue'
+import BorderBeam from '@/components/effects/magicui/BorderBeam.vue'
+import PulsatingButton from '@/components/effects/magicui/PulsatingButton.vue'
+
 // ── State ─────────────────────────────────────────────────────────────
 const activeNav = ref('home')
 const activeModal = ref(null)
@@ -981,6 +1060,13 @@ const isDetected = ref(true)
 const showHeatmap = ref(false)
 const showBBoxes = ref(true)
 const inferenceSpeed = ref('14.2ms')
+
+// 植株健康度（Magic UI NumberTicker 消费的数值源）
+const plantHealthValue = computed(() =>
+  currentSample.value && isDetected.value
+    ? Math.max(10, Math.round(100 - currentSample.value.damageRate))
+    : 94,
+)
 
 function triggerUpload() {
   if (fileInputRef.value) {
@@ -2482,15 +2568,15 @@ onUnmounted(() => {
     }
 
     .dd-pathogen-txt {
-      font-size: 12px;
-      color: #667085;
+      font-size: 12.5px;
+      color: #475467;
       line-height: 1.2;
     }
   }
 
   .dd-severity-badge {
     color: #ffffff;
-    font-size: 12.5px;
+    font-size: 13px;
     font-weight: 700;
     padding: 3px 11px;
     border-radius: 9999px;
@@ -2506,7 +2592,7 @@ onUnmounted(() => {
   padding-top: 6px;
 
   .dd-metrics-subcol {
-    width: 38%;
+    width: 36%;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -2527,8 +2613,8 @@ onUnmounted(() => {
       }
 
       .stat-lbl {
-        font-size: 12px;
-        color: #667085;
+        font-size: 13px;
+        color: #475467;
         font-weight: 500;
       }
 
@@ -2542,9 +2628,9 @@ onUnmounted(() => {
       }
 
       .stat-val-sm {
-        font-size: 12.5px;
+        font-size: 13px;
         font-weight: 600;
-        color: #1d2939;
+        color: #101828;
       }
 
       .stat-progress-line {
@@ -2610,7 +2696,7 @@ onUnmounted(() => {
       justify-content: space-between;
       background: #ffffff;
       border-radius: 6px;
-      padding: 4px 6px;
+      padding: 4px 3px;
       border: 1px solid #f2f4f7;
 
       .d-param-item {
@@ -2620,8 +2706,10 @@ onUnmounted(() => {
         gap: 1px;
 
         .dp-k {
-          font-size: 11px;
-          color: #98a2b3;
+          font-size: 12px;
+          color: #667085;
+          font-weight: 500;
+          white-space: nowrap;
         }
 
         .dp-v {
@@ -2636,8 +2724,8 @@ onUnmounted(() => {
       display: flex;
       align-items: center;
       gap: 5px;
-      font-size: 11.5px;
-      color: #027a48;
+      font-size: 12px;
+      color: #05603a;
       background: #ecfdf3;
       padding: 3px 6px;
       border-radius: 4px;
@@ -2666,6 +2754,8 @@ onUnmounted(() => {
 }
 
 .weather-plot-card {
+  position: relative;
+  overflow: hidden;
   width: calc(50% - 4px);
   height: 248px;
   background: #ffffff;

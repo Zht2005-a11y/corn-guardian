@@ -1,0 +1,67 @@
+/* ==========================================================================
+   Magic UI · keyframes
+   Pulled verbatim from the shadcn registry items' `css` / `cssVars` fields:
+     @magicui/shine-border  -> @keyframes shine
+     @magicui/pulsating-button -> @keyframes pulse / pulse-ripple
+   `border-beam` has no registry CSS because the React version tweens
+   offsetDistance through motion — same property, expressed as keyframes here.
+   ========================================================================== */
+
+/* @magicui/shine-border */
+@keyframes shine {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 100% 100%;
+  }
+  to {
+    background-position: 0% 0%;
+  }
+}
+
+/* @magicui/pulsating-button */
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--pulse-color);
+  }
+  50% {
+    box-shadow: 0 0 0 var(--distance) var(--pulse-color);
+  }
+}
+
+@keyframes pulse-ripple {
+  0% {
+    box-shadow: 0 0 0 0 var(--pulse-color);
+  }
+  100% {
+    box-shadow: 0 0 0 var(--distance) transparent;
+  }
+}
+
+/* @magicui/border-beam — mirrors the motion `offsetDistance` tween */
+@keyframes border-beam {
+  from {
+    offset-distance: var(--beam-from, 0%);
+  }
+  to {
+    offset-distance: var(--beam-to, 100%);
+  }
+}
+
+/* @magicui/dot-pattern — glow variant (opacity .4 -> 1 -> .4, scale 1 -> 1.5 -> 1) */
+@keyframes dot-pattern-glow {
+  0% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.5);
+  }
+  100% {
+    opacity: 0.4;
+    transform: scale(1);
+  }
+}
