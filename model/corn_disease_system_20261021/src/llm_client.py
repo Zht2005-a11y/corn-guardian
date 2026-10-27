@@ -10,7 +10,9 @@
 5. 毫秒级离线专家知识库自动兜底，确保大屏 100% 高可用;
 6. Stop Hook（回合结束钩子）：模型完成一轮回答、agent loop 即将停止时触发，可校验最终回答质量
    并决定「放行结束」或「携带反馈打回重答」（语义对齐 Claude Code hooks 的 Stop 事件），
-   内置 MAX_STOP_HOOK_BLOCKS 拦截上限防止无限循环（等价于 stop_hook_active 保护）。
+   内置 MAX_STOP_HOOK_BLOCKS 拦截上限防止无限循环（等价于 stop_hook_active 保护）；
+7. 会话找回（JSONL 落盘持久化，复用 Claude Code --resume 机制）：每段对话 append-only 写入
+   sessions/<session_id>.jsonl（实现见 src/session_store.py），后端重启后历史会话仍可列表与恢复。
 """
 from __future__ import annotations
 
@@ -27,6 +29,7 @@ import httpx
 
 from src.knowledge_base import get_knowledge
 from src.web_search import web_search
+from src import session_store
 
 logger = logging.getLogger("corn_system.llm")
 
@@ -269,19 +272,34 @@ class PseudoToolCallGuard:
 # 问题：api_messages 是生成器局部变量，用户点停止 → aclose() → 连同已拿到的检索
 # 结果一起销毁；前端 history 只有文字、拿不到 tool 消息。于是「继续」只能接着写
 # 半截句子，接不上「已经查过什么、查到了什么」。
-# 方案：按 session_id 缓存完整 messages（含 tool 消息与半截回答），TTL 5 分钟。
-# 语义对齐 Claude Code：它的 messages 是会话级持久状态，打断只是停流，上下文不丢。
+# 方案（两层，对齐 Claude Code「messages 是会话级持久状态」的设计）：
+#   ① 内存快照 _SESSIONS：按 session_id 缓存完整 messages（含 tool 消息与半截回答），
+#      TTL 5 分钟，同进程热路径（「继续」秒级恢复）；
+#   ② 磁盘 transcript（session_store.record_turn）：同一份 messages 增量 append-only
+#      落盘 sessions/<sid>.jsonl，跨进程重启仍可找回（--resume 语义）。
+# 恢复时基底解析优先级：内存快照 → 磁盘 transcript → 前端 history。
 # ─────────────────────────────────────────────────────────────────────────────
 SESSION_TTL_SECONDS = 300
 MAX_SESSIONS = 50
 _SESSIONS: Dict[str, Dict[str, Any]] = {}
 
-# 「继续」类短指令：命中且消息很短时才走快照恢复，避免把「继续使用苯醚甲环唑…」误判
+# 恢复进上下文的基底消息数上限：长会话整段恢复会撑爆上下文窗口；
+# 截断必须从「普通用户消息」边界起（见 _trim_restored_base），保证
+# assistant 的 tool_calls 与后续配对的 tool 消息不被拆散（网关要求严格配对）
+MAX_RESTORED_MESSAGES = 40
+
+# 「继续」类短指令：命中且消息很短时才成立，避免把「继续使用苯醚甲环唑…」误判
 _CONTINUE_RE = re.compile(r"^(继续|接着|往下|然后呢|接着说|继续说|再往下|go on|continue)", re.I)
 
 
 def wants_continue(message: str) -> bool:
-    """是否是「继续上次被打断的任务」这类短指令"""
+    """是否是「继续上次被打断的任务」这类短指令。
+
+    会话恢复本身不再要求该措辞（磁盘找回后任何追问都带全上下文，
+    与 Claude Code 同一次会话内连续追问等价）；此函数现仅用于决定是否向
+    前端推 `resume` 提示事件——用户明确说「继续」或从磁盘找回时才提示，
+    普通追问静默恢复，避免每条消息都冒提示。
+    """
     text = (message or "").strip()
     return len(text) <= 12 and bool(_CONTINUE_RE.match(text))
 
@@ -325,6 +343,21 @@ def clear_session(session_id: Optional[str]) -> None:
     """主动丢弃会话快照"""
     if session_id:
         _SESSIONS.pop(session_id, None)
+
+
+def _trim_restored_base(msgs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """把恢复基底截断到最近 MAX_RESTORED_MESSAGES 条，边界对齐到普通用户消息。
+
+    窗口内找不到普通用户消息（例如整段都是 tool 结果）时原样保留，
+    宁可能多一点上下文，也不能拆散 tool_calls 与 tool 的配对。
+    """
+    if len(msgs) <= MAX_RESTORED_MESSAGES:
+        return msgs
+    window = msgs[-MAX_RESTORED_MESSAGES:]
+    for i, m in enumerate(window):
+        if session_store.is_plain_user_message(m):
+            return window[i:]
+    return window
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -757,7 +790,10 @@ async def stream_ask_agnes(
        默认执行 default_stop_hook 质量门禁：允许放行结束，或携带反馈打回重答（前端收到
        type='stop_hook' 事件）。累计拦截 MAX_STOP_HOOK_BLOCKS 次后强制放行，保证必然终止。
        可通过 stop_hook 参数注入自定义钩子（返回 None/True/False/str/dict，见 _decide_stop）；
-    5. 异常与离线兜底：毫秒级切换本地植保知识库，并通过平滑微步模拟自然打字机流式输出，杜绝瞬间暴冲。
+    5. 异常与离线兜底：毫秒级切换本地植保知识库，并通过平滑微步模拟自然打字机流式输出，杜绝瞬间暴冲；
+    6. 会话找回（resume）：上下文基底按 内存快照 → 磁盘 transcript → 前端 history 三级解析，
+       磁盘上有该会话时任何追问自动携带完整上下文（含历史检索结果），无需「继续」措辞；
+       恢复的基底截断到 MAX_RESTORED_MESSAGES 条且边界对齐普通用户消息。
     """
     # ── 多轮 messages 组装：system 包装专家设定与感知上下文，history 保持原 role ──
     ctx_block = build_context_block(context)
@@ -766,35 +802,56 @@ async def stream_ask_agnes(
         system_content = f"{system_content}\n{ctx_block}"
 
     api_messages: List[Dict[str, Any]] = [{"role": "system", "content": system_content}]
-    if history:
-        for item in history[-6:]:
-            role = item.get("role")
-            text = item.get("content") or item.get("text", "")
-            if not text:
-                continue
-            if role in ("user", "human"):
-                api_messages.append({"role": "user", "content": text})
-            elif role in ("ai", "assistant"):
-                api_messages.append({"role": "assistant", "content": text})
 
-    # ── 会话恢复：用户说「继续」且命中快照 → 直接在原 messages 上续跑 ──
-    # 快照里含已执行的 tool 消息（检索结果）与已流出的半截回答，因此能真正「接着干」，
-    # 而不是靠前端 history 里的纯文字重建（那样检索结果必然丢失）。
-    resumed_from_cache = False
-    if session_id and wants_continue(message):
+    # ── 会话找回（复用 Claude Code --resume 语义，磁盘层见 src/session_store.py）──
+    # 基底解析优先级：内存快照（热）→ 磁盘 transcript（冷，跨重启/跨页面）→ 前端 history。
+    # 快照/磁盘里都含已执行的 tool 消息（检索结果）与已流出的半截回答，因此能真正
+    # 「接着干」，而不是靠前端纯文字 history 重建（那样检索结果必然丢失）。
+    # system 消息含日期/农时等逐轮变化的内容，一律从基底中剔除、本轮重建。
+    base_msgs: Optional[List[Dict[str, Any]]] = None
+    resume_source: Optional[str] = None
+    if session_id:
         cached = load_session(session_id)
         if cached:
-            api_messages = cached
-            resumed_from_cache = True
-            logger.info(f"命中会话快照，恢复被打断的任务: session={session_id} 消息数={len(cached)}")
+            base_msgs, resume_source = cached, "cache"
+        else:
+            rows = session_store.read_rows(session_id)
+            if rows:
+                base_msgs, resume_source = session_store.transcript_messages(rows), "disk"
+
+    if base_msgs:
+        base_msgs = [m for m in base_msgs if m.get("role") != "system"]
+        base_msgs = _trim_restored_base(base_msgs)
+        api_messages.extend(base_msgs)
+        # 基底已存在于磁盘（或同进程内已落盘）：本轮只记增量，避免把恢复来的基底重复追加
+        recordable_from = len(api_messages)
+        logger.info(f"会话找回({resume_source}): session={session_id} 恢复 {len(base_msgs)} 条消息")
+    else:
+        # 兼容旧版：盘上无该会话时退回前端传来的纯文字 history 作上下文来源；
+        # recordable_from 取 system 后一位——新会话的历史行与本轮行都要落盘，
+        # 之后的磁盘找回才能拿到完整上下文
+        if history:
+            for item in history[-6:]:
+                role = item.get("role")
+                text = item.get("content") or item.get("text", "")
+                if not text:
+                    continue
+                if role in ("user", "human"):
+                    api_messages.append({"role": "user", "content": text})
+                elif role in ("ai", "assistant"):
+                    api_messages.append({"role": "assistant", "content": text})
+        recordable_from = 1
 
     api_messages.append({"role": "user", "content": message})
 
-    if resumed_from_cache:
-        yield f"data: {json.dumps({'type': 'resume', 'action': 'restored', 'messages': len(api_messages)}, ensure_ascii=False)}\n\n"
+    # resume 事件只在「用户有感知地切换上下文」时提示：磁盘找回（主动挑选历史会话）、
+    # 或命中缓存且用户明说「继续」；缓存命中的普通追问静默恢复
+    if resume_source == "disk" or (resume_source == "cache" and wants_continue(message)):
+        yield f"data: {json.dumps({'type': 'resume', 'action': 'restored', 'source': resume_source, 'messages': len(api_messages)}, ensure_ascii=False)}\n\n"
 
     reply_acc = ""  # 提前初始化：保证 finally 里保存快照时一定存在
     round_content = ""  # 同上：被中断时用它兜住当前轮的半截回答
+    fallback_text = ""  # 离线兜底回复全文：兜底回答也要进 transcript，找回时上下文不丢
 
     url = f"{base_url.rstrip('/')}/chat/completions"
     headers = {
@@ -1073,7 +1130,22 @@ async def stream_ask_agnes(
     finally:
         # 无论正常结束、异常还是被用户打断（aclose 触发的 GeneratorExit），都保存快照，
         # 供下一轮「继续」时恢复。注意：此处不能 yield，生成器正在关闭。
+        turn_reply = reply_acc or round_content
         try:
-            save_session(session_id, api_messages, reply_acc or round_content)
+            save_session(session_id, api_messages, turn_reply)
         except Exception as exc:  # 快照失败绝不能影响主流程
             logger.debug(f"保存会话快照失败: {exc}")
+        # 磁盘持久化（会话找回）：把本轮增量消息 append 进 sessions/<sid>.jsonl，
+        # 进程重启后仍可列出并找回该会话。增量基准是 recordable_from——
+        # 恢复基底已落盘（或同进程已记录），只写本轮新增，保证 JSONL 线性无重复
+        try:
+            session_store.record_turn(session_id, api_messages[recordable_from:], turn_reply)
+        except Exception as exc:
+            logger.debug(f"会话 transcript 落盘失败: {exc}")
+        # 离线兜底回复也补记为一条 assistant 行：用户看到的兜底内容同样属于
+        # 对话历史，恢复会话时模型不应"忘记"自己回答过什么
+        if fallback_text:
+            try:
+                session_store.record_turn(session_id, [], fallback_text)
+            except Exception as exc:
+                logger.debug(f"会话 transcript 落盘失败(兜底): {exc}")

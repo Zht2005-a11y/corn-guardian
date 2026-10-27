@@ -30,6 +30,9 @@ model/**/outputs/
 model/**/runs/
 model/**/logs/
 
+# ===== 会话找回 transcript（灵动岛历史会话，运行时数据，不入库）=====
+model/corn_disease_system_20261021/sessions/
+
 # ===== 数据集（约 191MB，不入库）=====
 dataset/
 *.zip

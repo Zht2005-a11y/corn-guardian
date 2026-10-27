@@ -706,19 +706,75 @@
 
           <!-- 展开态：AI 问答面板（常驻 DOM） -->
           <div ref="panelEl" class="dyn-island-panel">
-          <div class="di-head">
+            <div class="di-head">
             <span class="di-avatar-pill">AI</span>
             <div class="di-head-txt">
               <h4>AI 植保问答助手</h4>
               <small>● 实时在线 · 专属植保知识库</small>
             </div>
+              <button class="di-head-btn" @click="toggleSessionHistory" :title="showHistory ? '返回对话' : '历史会话'">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <circle cx="8" cy="8" r="6"/>
+                  <path d="M8 4.8V8l2.2 1.4" stroke-linecap="round"/>
+                </svg>
+              </button>
+              <button class="di-head-btn" @click="startNewSession" title="新会话">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.8">
+                  <path d="M8 3.2v9.6M3.2 8h9.6" stroke-linecap="round"/>
+                </svg>
+              </button>
               <button class="di-collapse-btn" @click="closeIsland" title="收起灵动岛">
                 <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M3 10L8 5L13 10"/>
                 </svg>
               </button>
             </div>
-            <div class="di-messages" ref="chatBodyRef">
+            <!-- 历史会话找回视图（对齐 claude --resume：列出落盘会话，点击即接着聊） -->
+            <div v-if="showHistory" class="di-history">
+              <div class="di-history-head">
+                <span class="di-history-title">历史会话</span>
+                <span class="di-history-sub">{{ sessionList.length ? '共 ' + sessionList.length + ' 段' : '' }}</span>
+              </div>
+              <div class="di-history-list">
+                <template v-if="loadingSessions">
+                  <div class="di-history-empty">正在加载历史会话...</div>
+                </template>
+                <template v-else-if="loadError">
+                  <!-- 失败态必须与空态区分：404=后端未重启（旧版无此路由），其余=网络异常。
+                       此前失败被静默吞掉显示成「暂无历史会话」，误导为没有历史数据 -->
+                  <div class="di-history-empty di-history-failed">
+                    <p>{{ loadError === 404 ? '后端服务版本较旧，请重启后端后重试' : '会话服务连接失败，请检查后端' }}</p>
+                    <button class="di-history-retry" @click="fetchSessionList">重试</button>
+                  </div>
+                </template>
+                <template v-else-if="!sessionList.length">
+                  <div class="di-history-empty">暂无历史会话</div>
+                </template>
+                <template v-else>
+                  <div
+                    v-for="s in sessionList"
+                    :key="s.session_id"
+                    class="di-history-item"
+                    :class="{ active: s.session_id === activeSessionId }"
+                    @click="restoreSession(s)"
+                  >
+                    <div class="di-history-main">
+                      <div class="di-history-name">{{ s.title }}</div>
+                      <div class="di-history-meta">
+                        <span>{{ s.modified }}</span>
+                        <span v-if="s.interrupted" class="di-history-tag">中断 · 可继续</span>
+                      </div>
+                    </div>
+                    <button
+                      class="di-history-del"
+                      :class="{ armed: pendingDeleteId === s.session_id }"
+                      @click.stop="removeSession(s)"
+                    >{{ pendingDeleteId === s.session_id ? '确认删除' : '✕' }}</button>
+                  </div>
+                </template>
+              </div>
+            </div>
+            <div v-show="!showHistory" class="di-messages" ref="chatBodyRef">
               <div
                 v-for="(msg, i) in messages"
                 :key="i"
@@ -747,7 +803,7 @@
                 <span>{{ toolStatus }}</span>
               </div>
             </div>
-            <div class="di-quick-row">
+            <div v-show="!showHistory" class="di-quick-row">
               <span
                 v-for="(q, qi) in fastQuestions"
                 :key="qi"
@@ -757,7 +813,7 @@
                 {{ q }}
               </span>
             </div>
-            <div class="di-input-bar">
+            <div v-show="!showHistory" class="di-input-bar">
               <input
                 v-model="inputText"
                 @keyup.enter="sendMessage"
@@ -1245,13 +1301,12 @@ async function runDetect() {
 }
 
 // ── Agnes-3.0 AI Chat ─────────────────────────────────────────────────
-const messages = ref([
-  {
-    role: 'ai',
-    text: '您好！我是 <strong>AI 植保问答助手</strong>，已连接示范田 24h 微气候传感器与田间监测数据。请问有什么可以协助您？',
-    searchQuery: ''
-  }
-])
+const WELCOME_MSG = {
+  role: 'ai',
+  text: '您好！我是 <strong>AI 植保问答助手</strong>，已连接示范田 24h 微气候传感器与田间监测数据。请问有什么可以协助您？',
+  searchQuery: ''
+}
+const messages = ref([WELCOME_MSG])
 const inputText = ref('')
 const aiTyping = ref(false)
 const toolStatus = ref('')
@@ -1280,8 +1335,101 @@ const fastQuestions = [
   '如何调配无人机变量施药处方？'
 ]
 
-// 会话标识：一次页面会话固定一个，用于中途打断后说「继续」时让后端恢复原任务
-const chatSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+// 会话标识：一次页面会话默认一个新 id，用于后端恢复上下文（内存快照 / 磁盘会话找回）。
+// 声明为 let——「会话找回」时需切换为历史会话 id；activeSessionId 是它的响应式镜像，
+// 供历史列表高亮当前会话用（普通 let 重新赋值不会触发视图更新）
+let chatSessionId = `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+const activeSessionId = ref(chatSessionId)
+
+function newSessionId() {
+  return `s_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+}
+
+// ── 会话找回（复用 claude --resume 机制：列出落盘会话 + 一键接着聊）────────
+const showHistory = ref(false)
+const sessionList = ref([])
+const loadingSessions = ref(false)
+const loadError = ref(false)  // 列表加载失败（404=后端旧版无该路由 / 其他=网络异常），与空态区分
+const pendingDeleteId = ref(null)
+
+function toggleSessionHistory() {
+  showHistory.value = !showHistory.value
+  if (showHistory.value) fetchSessionList()
+}
+
+async function fetchSessionList() {
+  loadingSessions.value = true
+  loadError.value = false
+  try {
+    const res = await axios.get('/api/screen/sessions')
+    sessionList.value = res.data?.data?.sessions || []
+  } catch (err) {
+    console.error('获取历史会话失败:', err)
+    loadError.value = err?.response?.status || true
+    sessionList.value = []
+  } finally {
+    loadingSessions.value = false
+  }
+}
+
+// 选定一段历史会话：拉取气泡数据回填 + 切换 chatSessionId。
+// 之后正常提问即可——后端自动以磁盘 transcript 为基底接着聊（含此前检索结果）
+async function restoreSession(s) {
+  if (!s || loadingSessions.value) return
+  try {
+    const res = await axios.get(`/api/screen/sessions/${encodeURIComponent(s.session_id)}`)
+    const d = res.data?.data
+    if (!d) return
+    chatSessionId = s.session_id
+    activeSessionId.value = s.session_id
+    const restored = (d.messages || [])
+      .filter(m => m.text)
+      .map(m => ({ role: m.role, text: m.text, searchQuery: m.searchQuery || '' }))
+    if (d.interrupted) {
+      // 末轮被打断（检索完成未答完等）：加一条提示气泡（hint 标记，不进上下文）
+      restored.push({
+        role: 'ai',
+        hint: true,
+        text: '⏸ 已找回上次会话，回答在此处中断。直接说「继续」即可接着完成。'
+      })
+    }
+    messages.value = restored.length ? restored : [WELCOME_MSG]
+    showHistory.value = false
+    await nextTick()
+    if (chatBodyRef.value) chatBodyRef.value.scrollTop = chatBodyRef.value.scrollHeight
+  } catch (err) {
+    console.error('找回会话失败:', err)
+  }
+}
+
+// 两步删除（首点击进入待确认态，3 秒内再点才真删），避免误删会话数据
+function removeSession(s) {
+  if (pendingDeleteId.value !== s.session_id) {
+    pendingDeleteId.value = s.session_id
+    setTimeout(() => {
+      if (pendingDeleteId.value === s.session_id) pendingDeleteId.value = null
+    }, 3000)
+    return
+  }
+  pendingDeleteId.value = null
+  axios.delete(`/api/screen/sessions/${encodeURIComponent(s.session_id)}`)
+    .then(() => {
+      if (chatSessionId === s.session_id) startNewSession()
+      fetchSessionList()
+    })
+    .catch(err => console.error('删除会话失败:', err))
+}
+
+// 新会话（等价 /clear）：换新会话 id，气泡回到欢迎语
+function startNewSession() {
+  chatSessionId = newSessionId()
+  activeSessionId.value = chatSessionId
+  messages.value = [WELCOME_MSG]
+  inputText.value = ''
+  toolStatus.value = ''
+  pendingDeleteId.value = null
+  showHistory.value = false
+}
 
 // 当前请求的中断控制器。必须放模块级——stopChat() 需要访问它
 // （此前声明在 sendMessage 内部，导致点「停止」时抛 ReferenceError）
@@ -1291,10 +1439,10 @@ async function sendMessage() {
   const query = inputText.value.trim()
   if (!query || aiTyping.value) return
 
-  // 多轮上下文：携带之前的对话（跳过固定欢迎语、不含本轮问题），后端按标准 messages 结构包装
+  // 多轮上下文：携带之前的对话（跳过固定欢迎语、提示气泡与本轮问题），后端按标准 messages 结构包装
   const history = messages.value
     .slice(1)
-    .filter(m => m.text)
+    .filter(m => m.text && !m.hint)
     .slice(-6)
     .map(m => ({ role: m.role, content: m.text }))
 
@@ -1364,8 +1512,11 @@ async function sendMessage() {
               ? '回答较长，正在继续生成...'
               : ''
           } else if (evt.type === 'resume') {
-            // 后端命中会话快照，正在接着上次被打断的任务继续（含此前已检索到的结果）
-            toolStatus.value = '已恢复上次中断的任务，正在继续处理...'
+            // 后端恢复会话上下文：source=disk 为从磁盘找回历史会话，
+            // 否则是命中缓存接着被打断的任务（含此前已检索到的结果）
+            toolStatus.value = evt.source === 'disk'
+              ? '已找回历史会话，正在接着上次继续...'
+              : '已恢复上次中断的任务，正在继续处理...'
           } else if (evt.type === 'retry') {
             // 上游请求抖动，后端正在指数退避重试（避免整段回答降级成离线模板）
             toolStatus.value = `网络波动，正在重试（${evt.attempt}/${evt.max}）...`
@@ -3160,7 +3311,8 @@ onUnmounted(() => {
       small { color: #17b26a; font-size: 10.5px; }
     }
 
-    .di-collapse-btn {
+    .di-collapse-btn,
+    .di-head-btn {
       width: 28px;
       height: 28px;
       border: none;
@@ -3368,6 +3520,156 @@ onUnmounted(() => {
         border-radius: 9999px;
         background: #17b26a;
         animation: pulse 1s infinite;
+      }
+    }
+  }
+
+  /* 历史会话找回视图（灵动岛内切换：对话 ⇄ 会话列表，对齐 claude --resume 选择器） */
+  .di-history {
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+
+    .di-history-head {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      padding: 10px 14px 8px;
+      flex-shrink: 0;
+
+      .di-history-title {
+        font-size: 12px;
+        font-weight: 600;
+        color: #f2f4f6;
+      }
+      .di-history-sub {
+        font-size: 10.5px;
+        color: #8d93a1;
+      }
+    }
+
+    .di-history-list {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 0 14px 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+
+      &::-webkit-scrollbar { width: 5px; }
+      &::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.16); border-radius: 3px; }
+    }
+
+    .di-history-empty {
+      font-size: 11.5px;
+      color: #8d93a1;
+      text-align: center;
+      padding: 28px 0;
+    }
+
+    /* 失败态：与「暂无数据」区分开，明确提示原因并可重试 */
+    .di-history-failed {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+
+      p {
+        margin: 0;
+        color: #eb4335;
+        line-height: 1.5;
+      }
+
+      .di-history-retry {
+        border: 1px solid rgba(235, 67, 53, 0.5);
+        background: rgba(235, 67, 53, 0.12);
+        color: #eb4335;
+        font-size: 11px;
+        padding: 4px 14px;
+        border-radius: 9999px;
+        cursor: pointer;
+
+        &:hover {
+          background: rgba(235, 67, 53, 0.22);
+        }
+      }
+    }
+
+    .di-history-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 12px;
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 8px;
+      cursor: pointer;
+      transition: background 0.15s, border-color 0.15s;
+
+      &:hover {
+        background: rgba(255, 255, 255, 0.09);
+        border-color: rgba(53, 197, 110, 0.45);
+      }
+      &.active {
+        border-color: rgba(53, 197, 110, 0.8);
+        background: rgba(53, 197, 110, 0.08);
+      }
+
+      .di-history-main { flex: 1; min-width: 0; }
+
+      .di-history-name {
+        font-size: 12.5px;
+        color: #e8eaed;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      .di-history-meta {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        margin-top: 3px;
+        font-size: 10px;
+        color: #8d93a1;
+
+        .di-history-tag {
+          color: #f9ad19;
+          background: rgba(249, 173, 25, 0.14);
+          padding: 1px 6px;
+          border-radius: 4px;
+          font-weight: 600;
+        }
+      }
+
+      .di-history-del {
+        flex-shrink: 0;
+        width: 22px;
+        height: 22px;
+        border: none;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.06);
+        color: #8d93a1;
+        font-size: 10px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+
+        &:hover {
+          background: rgba(235, 67, 53, 0.18);
+          color: #eb4335;
+        }
+        &.armed {
+          width: auto;
+          padding: 0 8px;
+          color: #eb4335;
+          background: rgba(235, 67, 53, 0.14);
+        }
       }
     }
   }

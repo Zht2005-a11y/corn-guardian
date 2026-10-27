@@ -71,8 +71,9 @@ run_frontend.bat   # Vite:    http://localhost:5173
 ├── frontend/                          # Vue3 + ECharts 大屏前端
 │   └── src/views/bigScreen/Layout.vue # 主屏（诊断/问答/灵动岛/主题切换都在这）
 ├── model/corn_disease_system_20261021/
-│   ├── app/bigscreen_api.py           # 大屏 API（/predict /chat/stream /telemetry）
-│   ├── src/llm_client.py              # LLM 客户端：流式问答 + 工具循环 + Stop Hook
+│   ├── app/bigscreen_api.py           # 大屏 API（/predict /chat/stream /sessions /telemetry）
+│   ├── src/llm_client.py              # LLM 客户端：流式问答 + 工具循环 + Stop Hook + 会话基底解析
+│   ├── src/session_store.py           # 会话找回存储层（JSONL 落盘，移植 Claude Code --resume 机制）
 │   ├── src/web_search.py              # web_search 工具实现
 │   ├── configs/config.example.yaml    # 配置模板（真实 config.yaml 不入库）
 │   └── docs/                          # Stop Hook 注释讲解 / Claude Code 差距分析
@@ -98,7 +99,8 @@ run_frontend.bat   # Vite:    http://localhost:5173
 - 工具结果按 `MAX_TOOL_RESULT_CHARS=8000` 截断（`_truncate_tool_result`），防止检索结果撑爆上下文；
 - Stop Hook 语义对齐 Claude Code hooks：`_decide_stop` 归一化返回值，block 时以 `[stop_hook 反馈]` 注入重答；
 - SSE 事件类型：`delta` / `tool_call` / `tool_result` / `retry` / `resume` / `stop_hook` / `truncated` / `done`，前端处理在 `Layout.vue` 的 `sendMessage()`；
-- **会话快照（打断后可继续）**：`api_messages` 是生成器局部变量，用户点停止即销毁。`llm_client.py` 按 `session_id` 缓存完整 messages（含 tool 消息与半截回答），TTL 300s、上限 50 条、命中即续期；用户说「继续」且命中快照时直接在原 messages 上续跑（`wants_continue()` 限定 ≤12 字，避免误判）。快照在生成器 `finally` 中保存，`aclose()` 触发的 GeneratorExit 同样会走 `finally`；
+- **会话快照（打断后可继续）**：`api_messages` 是生成器局部变量，用户点停止即销毁。`llm_client.py` 按 `session_id` 缓存完整 messages（含 tool 消息与半截回答），TTL 300s、上限 50 条、命中即续期。快照在生成器 `finally` 中保存，`aclose()` 触发的 GeneratorExit 同样会走 `finally`；
+- **会话找回（JSONL 落盘，复用 Claude Code --resume 机制）**：每段对话 append-only 写入 `<system_root>/sessions/<sid>.jsonl`（存储层 `src/session_store.py`：每行带 uuid/parentUuid/timestamp/message，`[stop_hook 反馈]`/截断续写等注入消息标 `isMeta`；system 消息不落盘、每轮重建）。恢复时基底上下文解析优先级：**内存快照 → 磁盘 transcript → 前端 history**——盘上有该会话时任何追问自动带全上下文（含历史检索结果），不再要求「继续」措辞（`wants_continue()` 现仅决定是否推 `resume` 提示事件，事件带 `source` 字段区分 disk/cache）；恢复基底截断到 `MAX_RESTORED_MESSAGES=40` 条且边界对齐普通用户消息，防止拆散 tool_calls 与 tool 的配对。列表用 stat mtime 排序 + 头尾 64KB 轻读（不做全量解析；标题优先级 lastPrompt > firstPrompt），API 为 `GET /screen/sessions(/{sid})` 与 `DELETE /screen/sessions/{sid}`（删除时同步清内存快照）；前端灵动岛头部时钟图标打开找回列表（两步删除防误触），恢复即切换 session_id 继续对话。`sessions/` 目录已 gitignore，勿把会话数据提交入库；
 - **工具结果必须先落库再 yield**：检索完成后立即 `api_messages.append({"role": "tool", ...})`，之后才推 `tool_result` 事件。否则用户恰好在通知那一刻打断，快照里就没有检索结果，「继续」时只能重查。
 - 回答被 `max_tokens` 截断时会自动注入续写指令（`MAX_RESUME_ROUNDS=3` 次，对齐 Claude Code 的截断恢复），前端收到 `truncated` 事件显示"正在继续生成"；
 - 前端聊天的联网检索提示文案必须与 `web_search.py` 实际实现一致（当前为 360/搜狗/百度国内直连），不要写"知网"等不实来源。
