@@ -262,6 +262,37 @@ async def get_preset_samples():
 
 
 # ==========================================================================
+#  1b. 病害图鉴知识库接口（前端侧边栏「病害图鉴」弹窗）
+# ==========================================================================
+@router.get("/knowledge")
+async def get_knowledge_base():
+    """返回全部病害类别的知识库条目，供前端「病害图鉴」弹窗展示。
+
+    依赖：KNOWLEDGE_BASE（src/knowledge_base.py，含 import 时回填的 control.chemical）、
+          COLOR_MAP（与诊断结果卡同源配色）
+    返回：data [{class_name_en, name_cn, name_en, pathogen, severity, color,
+                 symptoms[], occurrence[], prescription{}, control{agricultural/chemical/field}}]
+    """
+    items = []
+    for class_folder, kb in KNOWLEDGE_BASE.items():
+        items.append(
+            {
+                "class_name_en": class_folder,
+                "name_cn": kb.get("name_cn", class_folder),
+                "name_en": kb.get("name_en", class_folder),
+                "pathogen": kb.get("pathogen", ""),
+                "severity": kb.get("severity", ""),
+                "color": COLOR_MAP.get(class_folder, "#059669"),
+                "symptoms": kb.get("symptoms", []),
+                "occurrence": kb.get("occurrence", []),
+                "prescription": kb.get("prescription", {}),
+                "control": kb.get("control", {}),
+            }
+        )
+    return {"code": 0, "message": "ok", "data": items}
+
+
+# ==========================================================================
 #  2. 大屏综合诊断推理接口 (支持 Grad-CAM、病斑 BBox、受损率、植保指导单)
 # ==========================================================================
 class Base64PredictRequest(BaseModel):
