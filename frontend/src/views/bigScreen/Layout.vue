@@ -939,7 +939,10 @@
       </div>
     </div>
 
-    <!-- 病害图鉴 · 识别与防治知识库 Modal -->
+    <!-- 病害图鉴 · 识别与防治知识库 Modal
+         弹窗特效：shadcn / Magic UI registry「hero-video-dialog」spring dialog 编排的 Vue 移植
+         （背景毛玻璃淡入 + 卡片 from-center spring 缩放 damping:30 / stiffness:300，关闭时反向收拢） -->
+    <Transition :css="false" @enter="onKbDialogEnter" @leave="onKbDialogLeave">
     <div class="modal-backdrop-blur" v-if="activeModal === 'knowledge'" @click.self="activeModal = null">
       <div class="tanee-modal-card large">
         <div class="t-modal-head">
@@ -1009,6 +1012,7 @@
         </div>
       </div>
     </div>
+    </Transition>
 
     <!-- Personal Center Modal（个人中心） -->
     <div class="modal-backdrop-blur" v-if="activeModal === 'profile'" @click.self="activeModal = null">
@@ -1055,6 +1059,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import axios from 'axios'
+import { animate } from 'motion'
 import gsap from 'gsap'
 import { marked } from 'marked'
 import * as echarts from 'echarts'
@@ -1386,6 +1391,53 @@ async function openKnowledge() {
     await loadKnowledge()
   }
 }
+
+// ── 知识库弹窗 spring 入退场 ───────────────────────────────────────────
+// 编排移植自 shadcn / Magic UI registry「hero-video-dialog」from-center 变体：
+// 背景毛玻璃淡入 + 卡片 spring 缩放（damping: 30 / stiffness: 300），关闭时反向收拢。
+// React 版的 AnimatePresence + motion.div 对应 Vue 的 <Transition :css="false"> + motion 的
+// animate()（与 NumberTicker.vue 同一依赖通道）。
+async function onKbDialogEnter(el, done) {
+  const card = el.querySelector('.tanee-modal-card')
+  if (!card || typeof animate !== 'function') { done(); return }
+  // 起始态在本帧绘制前内联写死，避免弹窗闪现原始尺寸
+  el.style.opacity = '0'
+  card.style.opacity = '0'
+  card.style.transform = 'scale(0.5)'
+  try {
+    await Promise.all([
+      animate(el, { opacity: [0, 1] }, { duration: 0.25, ease: 'easeOut' }),
+      animate(card, { opacity: [0, 1], scale: [0.5, 1] }, { type: 'spring', damping: 30, stiffness: 300 }),
+    ])
+  } finally {
+    el.style.opacity = ''
+    card.style.opacity = ''
+    card.style.transform = ''
+    done()
+  }
+}
+
+async function onKbDialogLeave(el, done) {
+  const card = el.querySelector('.tanee-modal-card')
+  if (!card || typeof animate !== 'function') { done(); return }
+  try {
+    await Promise.all([
+      animate(el, { opacity: [1, 0] }, { duration: 0.2, ease: 'easeIn' }),
+      animate(card, { opacity: [1, 0], scale: [1, 0.5] }, { duration: 0.2, ease: 'easeIn' }),
+    ])
+  } finally {
+    done()
+  }
+}
+
+// hero-video-dialog 交互惯例：Esc 关闭弹窗
+function onKbKeydown(e) {
+  if (e.key === 'Escape' && activeModal.value === 'knowledge') {
+    activeModal.value = null
+  }
+}
+onMounted(() => window.addEventListener('keydown', onKbKeydown))
+onUnmounted(() => window.removeEventListener('keydown', onKbKeydown))
 
 function selectPreset(s, autoDetect = true) {
   currentSampleId.value = s.id
