@@ -421,7 +421,7 @@
                         <path d="M8 14C8 14 13 9.5 13 6C13 3.23858 10.7614 1 8 1C5.23858 1 3 3.23858 3 6C3 9.5 8 14 8 14Z"/>
                         <circle cx="8" cy="6" r="2" fill="#333333"/>
                       </svg>
-                      <span class="loc-text">德国 · 魏尔堡</span>
+                      <span class="loc-text">贵阳 · 乌当</span>
                     </div>
                     <button class="m-corner-arrow-btn grey-arrow" @click.stop="activeModal = 'telemetry'">
                       <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
