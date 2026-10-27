@@ -739,6 +739,14 @@
                 <template v-if="loadingSessions">
                   <div class="di-history-empty">正在加载历史会话...</div>
                 </template>
+                <template v-else-if="loadError">
+                  <!-- 失败态必须与空态区分：404=后端未重启（旧版无此路由），其余=网络异常。
+                       此前失败被静默吞掉显示成「暂无历史会话」，误导为没有历史数据 -->
+                  <div class="di-history-empty di-history-failed">
+                    <p>{{ loadError === 404 ? '后端服务版本较旧，请重启后端后重试' : '会话服务连接失败，请检查后端' }}</p>
+                    <button class="di-history-retry" @click="fetchSessionList">重试</button>
+                  </div>
+                </template>
                 <template v-else-if="!sessionList.length">
                   <div class="di-history-empty">暂无历史会话</div>
                 </template>
@@ -1341,6 +1349,7 @@ function newSessionId() {
 const showHistory = ref(false)
 const sessionList = ref([])
 const loadingSessions = ref(false)
+const loadError = ref(false)  // 列表加载失败（404=后端旧版无该路由 / 其他=网络异常），与空态区分
 const pendingDeleteId = ref(null)
 
 function toggleSessionHistory() {
@@ -1350,11 +1359,13 @@ function toggleSessionHistory() {
 
 async function fetchSessionList() {
   loadingSessions.value = true
+  loadError.value = false
   try {
     const res = await axios.get('/api/screen/sessions')
     sessionList.value = res.data?.data?.sessions || []
   } catch (err) {
     console.error('获取历史会话失败:', err)
+    loadError.value = err?.response?.status || true
     sessionList.value = []
   } finally {
     loadingSessions.value = false
@@ -3557,6 +3568,34 @@ onUnmounted(() => {
       color: #8d93a1;
       text-align: center;
       padding: 28px 0;
+    }
+
+    /* 失败态：与「暂无数据」区分开，明确提示原因并可重试 */
+    .di-history-failed {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+
+      p {
+        margin: 0;
+        color: #eb4335;
+        line-height: 1.5;
+      }
+
+      .di-history-retry {
+        border: 1px solid rgba(235, 67, 53, 0.5);
+        background: rgba(235, 67, 53, 0.12);
+        color: #eb4335;
+        font-size: 11px;
+        padding: 4px 14px;
+        border-radius: 9999px;
+        cursor: pointer;
+
+        &:hover {
+          background: rgba(235, 67, 53, 0.22);
+        }
+      }
     }
 
     .di-history-item {
