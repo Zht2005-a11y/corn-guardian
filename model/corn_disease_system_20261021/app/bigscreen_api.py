@@ -22,6 +22,7 @@ from PIL import Image
 from src.config import load_config
 from src import session_store
 from src import history_store
+from src import alert_store
 from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge, get_prescription, compose_prescription
 from src.llm_client import ask_agnes, clear_session, stream_ask_agnes
 
@@ -401,7 +402,7 @@ def _diagnose_one(data: bytes, filename: str, model_key: str) -> Dict[str, Any]:
     }
 
     # 诊断历史落盘（失败不影响主流程）
-    history_store.save_record(
+    record_id = history_store.save_record(
         image_bytes=data,
         gradcam_b64=result.get("gradcam_base64", ""),
         class_en=class_en,
@@ -415,6 +416,21 @@ def _diagnose_one(data: bytes, filename: str, model_key: str) -> Dict[str, Any]:
         drone_params=drone_params,
         boxes=boxes,
     )
+
+    # 由本次结果生成告警（按 rule+ref_id 去重；异常不影响诊断返回）
+    same_today = history_store.count_today_by_class(class_en) if record_id else 0
+    new_alerts = alert_store.emit_for_diagnosis(
+        record_id=record_id,
+        class_en=class_en,
+        class_cn=class_cn,
+        severity=severity,
+        damage_rate=damage_rate,
+        confidence=result["confidence"],
+        filename=filename,
+        same_class_today=same_today,
+    )
+    result["historyId"] = record_id
+    result["newAlerts"] = len(new_alerts)
 
     return result
 
@@ -565,6 +581,36 @@ async def delete_history(record_id: int):
     if not history_store.delete_record(record_id):
         raise HTTPException(status_code=404, detail="记录不存在")
     return {"code": 0, "message": "ok", "data": {"deleted": record_id}}
+
+
+# ==========================================================================
+#  2.6 告警中心（诊断自动生成，替代大屏写死的「3 条告警」）
+# ==========================================================================
+@router.get("/alerts")
+async def list_alerts(limit: int = 50, unread_only: bool = False):
+    """告警列表（时间倒序）+ 统计：unread / total / today。"""
+    items, stats = alert_store.list_alerts(limit=limit, unread_only=unread_only)
+    return {"code": 0, "message": "ok", "data": {"items": items, "stats": stats}}
+
+
+@router.post("/alerts/{alert_id}/read")
+async def read_alert(alert_id: int):
+    if not alert_store.mark_read(alert_id):
+        raise HTTPException(status_code=404, detail="告警不存在")
+    return {"code": 0, "message": "ok", "data": {"read": alert_id}}
+
+
+@router.post("/alerts/read-all")
+async def read_all_alerts():
+    n = alert_store.mark_all_read()
+    return {"code": 0, "message": "ok", "data": {"updated": n}}
+
+
+@router.delete("/alerts/{alert_id}")
+async def delete_alert(alert_id: int):
+    if not alert_store.delete_alert(alert_id):
+        raise HTTPException(status_code=404, detail="告警不存在")
+    return {"code": 0, "message": "ok", "data": {"deleted": alert_id}}
 
 
 # ==========================================================================
