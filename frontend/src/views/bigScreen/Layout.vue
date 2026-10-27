@@ -2015,6 +2015,13 @@ onUnmounted(() => {
     height: 20px;
   }
 
+  /* 白色原始填充的 SVG（icon-16 房子 fill="white"）：非选中时转为 #333333，
+     与内联描边图标同色，避免白底白图标"隐形"；选中态由 .active 反白 */
+  .white-filter {
+    filter: brightness(0) invert(0.2);
+    transition: filter 0.15s ease;
+  }
+
   &.active {
     background: #1e2024;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
