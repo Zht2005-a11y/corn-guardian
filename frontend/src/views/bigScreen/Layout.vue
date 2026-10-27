@@ -1994,14 +1994,14 @@ onUnmounted(() => {
   flex: 1;
   width: 100%;
   min-height: 275px;
-  background: #15191c;
+  background: #f4f4f4;
   border-radius: 6px;
   position: relative;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  box-shadow: inset 0 0 0 1px #dcdcdc;
 
   /* 图像显示舞台：自适应包裹叶片，使标注框百分比基准严格对应叶片本身 */
   .canvas-image-stage {
