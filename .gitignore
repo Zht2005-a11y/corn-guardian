@@ -55,3 +55,6 @@ model/corn_disease_system_20261021/configs/config.yaml
 .workbuddy-ai/
 tmp_edge/
 *.log
+
+# 诊断历史 SQLite（运行时生成，不入库）
+model/corn_disease_system_20261021/history/

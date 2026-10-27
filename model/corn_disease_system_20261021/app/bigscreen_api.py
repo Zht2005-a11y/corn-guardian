@@ -21,6 +21,7 @@ from PIL import Image
 
 from src.config import load_config
 from src import session_store
+from src import history_store
 from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge, get_prescription
 from src.llm_client import ask_agnes, clear_session, stream_ask_agnes
 
@@ -369,7 +370,49 @@ async def predict_screen(req: Base64PredictRequest):
         "inference_ms": res.get("inference_time_ms", 14.2),
     }
 
+    # 诊断历史落盘（失败不影响主流程）
+    history_store.save_record(
+        image_bytes=data,
+        gradcam_b64=result.get("gradcam_base64", ""),
+        class_en=class_en,
+        class_name=class_cn,
+        confidence=result["confidence"],
+        severity=severity,
+        damage_rate=damage_rate,
+        model_used=model_key,
+        inference_ms=result.get("inference_ms"),
+        prescription=prescription,
+        drone_params=drone_params,
+        boxes=boxes,
+    )
+
     return {"code": 0, "message": "ok", "data": result}
+
+
+# ==========================================================================
+#  2.5 诊断历史（每次识别自动落盘，可回看 / 删除 / 统计）
+# ==========================================================================
+@router.get("/history")
+async def list_history(limit: int = 50, offset: int = 0):
+    """诊断历史列表（时间倒序）+ 统计：total / today / byClass。"""
+    items, stats = history_store.list_records(limit=limit, offset=offset)
+    return {"code": 0, "message": "ok", "data": {"items": items, "stats": stats}}
+
+
+@router.get("/history/{record_id}")
+async def get_history(record_id: int):
+    """单条诊断历史详情：含 Grad-CAM 热力图与飞防参数。"""
+    rec = history_store.get_record(record_id)
+    if rec is None:
+        raise HTTPException(status_code=404, detail="记录不存在")
+    return {"code": 0, "message": "ok", "data": rec}
+
+
+@router.delete("/history/{record_id}")
+async def delete_history(record_id: int):
+    if not history_store.delete_record(record_id):
+        raise HTTPException(status_code=404, detail="记录不存在")
+    return {"code": 0, "message": "ok", "data": {"deleted": record_id}}
 
 
 # ==========================================================================
