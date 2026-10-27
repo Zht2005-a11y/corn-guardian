@@ -119,9 +119,9 @@
                    Magic UI · PulsatingButton — 告警呼吸光环 -->
               <PulsatingButton
                 class="alerts-pill-btn"
-                pulse-color="rgba(26, 26, 26, 0.28)"
-                duration="2.2s"
-                distance="7px"
+                pulse-color="rgba(23, 178, 106, 0.55)"
+                duration="1.8s"
+                distance="10px"
                 @click="activeModal = 'alerts'"
                 title="农场告警"
               >
@@ -276,19 +276,27 @@
                       </button>
                     </div>
 
-                    <button
-                      class="canvas-action-btn"
-                      :class="{ 'pulse-highlight': !isDetected && !isDetecting }"
-                      @click="runDetect"
-                      :disabled="isDetecting"
-                      title="触发 AI 多尺度检测"
-                    >
-                      <svg v-if="!isDetecting" viewBox="0 0 16 16" fill="currentColor">
-                        <path d="M8 1L9.4 6.6L15 8L9.4 9.4L8 15L6.6 9.4L1 8L6.6 6.6L8 1Z"/>
-                      </svg>
-                      <span class="btn-spinner" v-else></span>
-                      <span>{{ isDetecting ? '诊断中...' : '开始诊断' }}</span>
-                    </button>
+                    <div class="canvas-right-group">
+                      <button class="canvas-action-btn ghost" @click="openHistory" title="回看历史诊断记录">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                          <circle cx="8" cy="8" r="6.2"/><path d="M8 4.8V8l2.4 1.6"/>
+                        </svg>
+                        <span>历史记录</span>
+                      </button>
+                      <button
+                        class="canvas-action-btn"
+                        :class="{ 'pulse-highlight': !isDetected && !isDetecting }"
+                        @click="runDetect"
+                        :disabled="isDetecting"
+                        title="触发 AI 多尺度检测"
+                      >
+                        <svg v-if="!isDetecting" viewBox="0 0 16 16" fill="currentColor">
+                          <path d="M8 1L9.4 6.6L15 8L9.4 9.4L8 15L6.6 9.4L1 8L6.6 6.6L8 1Z"/>
+                        </svg>
+                        <span class="btn-spinner" v-else></span>
+                        <span>{{ isDetecting ? '诊断中...' : '开始诊断' }}</span>
+                      </button>
+                    </div>
                   </div>
                 </div>
 
@@ -423,7 +431,7 @@
                 <!-- Weather & Plot Card -->
                 <div class="weather-plot-card" @click="activeModal = 'telemetry'">
                   <!-- Magic UI · ShineBorder — 卡片边缘流光 -->
-                  <ShineBorder :border-width="1.5" :duration="12" :shine-color="['#8DF3B8', '#17B26A']" />
+                  <ShineBorder :border-width="3" :duration="7" :shine-color="['#8DF3B8', '#17B26A', '#0F9755']" />
 
                   <!-- Location & Time Bar -->
                   <div class="wp-top-bar">
@@ -474,7 +482,7 @@
                 <!-- Camera Live Carousel Card (Exact Original) -->
                 <div class="camera-live-box" @mouseenter="pauseCarousel" @mouseleave="resumeCarousel">
                   <!-- Magic UI · BorderBeam — 实时画面光带 -->
-                  <BorderBeam :size="70" :duration="7" color-from="#8DF3B8" color-to="#35C56E" :border-width="1.5" />
+                  <BorderBeam :size="140" :duration="4" color-from="#B9FBD4" color-to="#17B26A" :border-width="3" />
 
                   <!-- 自动轮播画面层（横向滑动切换） -->
                   <div class="cam-carousel-stage">
@@ -564,7 +572,7 @@
                 >
                   <template #overlay>
                     <!-- Magic UI · ShineBorder — 主卡流转高光 -->
-                    <ShineBorder :border-width="1.5" :duration="16" :shine-color="['#ffffff', '#BFF3D5', '#ffffff']" />
+                    <ShineBorder :border-width="3" :duration="9" :shine-color="['#ffffff', '#8DF3B8', '#ffffff']" />
                   </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
@@ -600,6 +608,9 @@
                   border-color="#F0F1F3"
                   @click="activeModal = 'telemetry'"
                 >
+                  <template #overlay>
+                    <ShineBorder :border-width="2.5" :duration="6.5" :shine-color="['#CBEFDD', '#17B26A', '#E6F7EE']" />
+                  </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <img src="/tanee/svg/dashboard/icon-14.svg" alt="Wind" class="m-svg-icon"/>
@@ -631,6 +642,9 @@
                   border-color="#F0F1F3"
                   @click="activeModal = 'telemetry'"
                 >
+                  <template #overlay>
+                    <ShineBorder :border-width="2.5" :duration="7.5" :shine-color="['#CBEFDD', '#17B26A', '#E6F7EE']" />
+                  </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <img src="/tanee/svg/dashboard/icon-13.svg" alt="Temperature" class="m-svg-icon"/>
@@ -662,6 +676,9 @@
                   border-color="#F0F1F3"
                   @click="activeModal = 'telemetry'"
                 >
+                  <template #overlay>
+                    <ShineBorder :border-width="2.5" :duration="8.5" :shine-color="['#CBEFDD', '#17B26A', '#E6F7EE']" />
+                  </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <svg class="m-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
@@ -695,6 +712,9 @@
                   border-color="#F0F1F3"
                   @click="activeModal = 'telemetry'"
                 >
+                  <template #overlay>
+                    <ShineBorder :border-width="2.5" :duration="9.5" :shine-color="['#CBEFDD', '#17B26A', '#E6F7EE']" />
+                  </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <svg class="m-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
@@ -728,6 +748,9 @@
                   border-color="#F0F1F3"
                   @click="activeModal = 'telemetry'"
                 >
+                  <template #overlay>
+                    <ShineBorder :border-width="2.5" :duration="10.5" :shine-color="['#CBEFDD', '#17B26A', '#E6F7EE']" />
+                  </template>
                   <div class="m-card-top">
                     <div class="m-title-flex">
                       <svg class="m-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
@@ -939,6 +962,98 @@
       </div>
     </div>
 
+    <!-- Diagnosis History Drawer（诊断历史 · SQLite 落盘） -->
+    <div class="modal-backdrop-blur" v-if="activeModal === 'history'" @click.self="activeModal = null">
+      <div class="tanee-modal-card large history-modal-card">
+        <div class="t-modal-head">
+          <div class="head-title-flex">
+            <img src="/tanee/svg/dashboard/icon-15.svg" alt="History" class="modal-head-icon"/>
+            <h4>诊断历史记录</h4>
+            <span v-if="historyStats" class="history-stat-chip">
+              今日 {{ historyStats.today }} 次 · 共 {{ historyStats.total }} 条
+            </span>
+          </div>
+          <button class="modal-close-btn" @click="activeModal = null">✕</button>
+        </div>
+        <div class="t-modal-body history-body">
+          <div v-if="historyLoading" class="history-empty">正在加载历史记录...</div>
+          <div v-else-if="historyError" class="history-empty">
+            {{ historyError }}
+            <button class="history-retry-btn" @click="loadHistory">重试</button>
+          </div>
+          <div v-else-if="!historyDetail && !historyItems.length" class="history-empty">
+            暂无诊断记录——去画布做一次「开始诊断」，记录会自动出现在这里
+          </div>
+
+          <!-- 详情视图 -->
+          <div v-else-if="historyDetail" class="history-detail">
+            <div class="history-detail-top">
+              <button class="history-back-btn" @click="historyDetail = null">← 返回列表</button>
+              <span class="history-detail-time">{{ fmtTime(historyDetail.created_at) }}</span>
+            </div>
+            <div class="history-detail-grid">
+              <div class="history-img-box">
+                <img v-if="historyDetail.thumb" :src="historyDetail.thumb" alt="原图"/>
+                <div v-else class="history-img-empty">无图片</div>
+                <span class="history-img-tag">原图</span>
+              </div>
+              <div class="history-img-box">
+                <img v-if="historyDetail.heatmap" :src="historyDetail.heatmap" alt="Grad-CAM 热力图"/>
+                <div v-else class="history-img-empty">本次未生成热力图</div>
+                <span class="history-img-tag cam">Grad-CAM</span>
+              </div>
+            </div>
+            <div class="history-detail-rows">
+              <div class="hrow">
+                <span>病害结论</span>
+                <strong class="hi-name">{{ historyDetail.class_name }}
+                  <em class="hi-en">{{ historyDetail.class_en }}</em>
+                </strong>
+              </div>
+              <div class="hrow">
+                <span>严重度 / 受损率</span>
+                <strong>
+                  <em class="hi-sev" :data-sev="historyDetail.severity">{{ historyDetail.severity }}</em>
+                  · {{ historyDetail.damage_rate }}%
+                </strong>
+              </div>
+              <div class="hrow">
+                <span>置信度 / 模型 / 耗时</span>
+                <strong>{{ historyDetail.confidence }}% · {{ historyDetail.model_used }} · {{ historyDetail.inference_ms }}ms</strong>
+              </div>
+              <div class="hrow">
+                <span>推荐机型</span>
+                <strong>{{ historyDetail.droneParams?.model || '—' }}</strong>
+              </div>
+              <div class="hrow rx">
+                <span>飞防处方</span>
+                <strong>{{ historyDetail.prescription || '—' }}</strong>
+              </div>
+            </div>
+          </div>
+
+          <!-- 列表视图 -->
+          <div v-else class="history-list">
+            <div v-for="it in historyItems" :key="it.id" class="history-item" @click="openHistoryDetail(it.id)">
+              <img v-if="it.thumb_small" :src="it.thumb_small" class="history-thumb" alt=""/>
+              <div v-else class="history-thumb history-thumb-empty">🍃</div>
+              <div class="history-item-main">
+                <div class="hi-row1">
+                  <strong>{{ it.class_name }}</strong>
+                  <em class="hi-sev" :data-sev="it.severity">{{ it.severity }}</em>
+                </div>
+                <div class="hi-row2">
+                  置信度 {{ it.confidence }}% · 受损率 {{ it.damage_rate }}% · {{ it.model_used }}
+                </div>
+              </div>
+              <span class="history-item-time">{{ fmtTime(it.created_at) }}</span>
+              <button class="history-del-btn" @click.stop="removeHistory(it.id)" title="删除该记录">✕</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Telemetry & Radar Drawer -->
     <div class="modal-backdrop-blur" v-if="activeModal === 'telemetry'" @click.self="activeModal = null">
       <div class="tanee-modal-card large">
@@ -985,7 +1100,7 @@
             </div>
           </div>
           <div class="profile-stats-grid">
-            <div class="profile-stat-cell"><strong>12</strong><span>今日诊断（次）</span></div>
+            <div class="profile-stat-cell"><strong>{{ historyStats ? historyStats.today : '—' }}</strong><span>今日诊断（次）</span></div>
             <div class="profile-stat-cell"><strong>47</strong><span>累计任务（个）</span></div>
             <div class="profile-stat-cell"><strong>8.6</strong><span>巡田里程（km）</span></div>
           </div>
@@ -1378,11 +1493,75 @@ async function runDetect() {
       }
       isDetected.value = true
       inferenceSpeed.value = data.inference_ms + 'ms'
+      refreshHistoryStats()
     }
   } catch (err) {
     console.error('推理检测失败:', err)
   } finally {
     isDetecting.value = false
+  }
+}
+
+// ── Diagnosis History（诊断历史 · /screen/history）───────────────────
+const historyItems = ref([])
+const historyStats = ref(null)
+const historyLoading = ref(false)
+const historyError = ref('')
+const historyDetail = ref(null)
+
+function fmtTime(iso) {
+  if (!iso) return ''
+  const m = String(iso).match(/(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/)
+  return m ? `${m[2]}-${m[3]} ${m[4]}:${m[5]}` : iso
+}
+
+async function loadHistory() {
+  historyLoading.value = true
+  historyError.value = ''
+  try {
+    const res = await axios.get('/api/screen/history', { params: { limit: 50 } })
+    if (res.data?.data) {
+      historyItems.value = res.data.data.items || []
+      historyStats.value = res.data.data.stats || null
+    }
+  } catch (err) {
+    console.error('历史记录加载失败:', err)
+    historyError.value = '历史记录加载失败，请检查后端服务'
+  } finally {
+    historyLoading.value = false
+  }
+}
+
+// 只刷统计（诊断成功后调用，不拉全量列表，避免无谓传输）
+async function refreshHistoryStats() {
+  try {
+    const res = await axios.get('/api/screen/history', { params: { limit: 1 } })
+    if (res.data?.data?.stats) historyStats.value = res.data.data.stats
+  } catch { /* 静默失败，不打扰诊断主流程 */ }
+}
+
+function openHistory() {
+  activeModal.value = 'history'
+  historyDetail.value = null
+  loadHistory()
+}
+
+async function openHistoryDetail(id) {
+  try {
+    const res = await axios.get(`/api/screen/history/${id}`)
+    if (res.data?.data) historyDetail.value = res.data.data
+  } catch (err) {
+    console.error('历史详情加载失败:', err)
+  }
+}
+
+async function removeHistory(id) {
+  try {
+    await axios.delete(`/api/screen/history/${id}`)
+    if (historyDetail.value?.id === id) historyDetail.value = null
+    await loadHistory()
+  } catch (err) {
+    console.error('删除历史记录失败:', err)
   }
 }
 
@@ -1796,6 +1975,7 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   loadSamples()
   restartCarousel()
+  refreshHistoryStats() // 个人中心「今日诊断」用真实计数
   // 灵动岛入场：从顶部缓缓落下
   if (islandEl.value) {
     gsap.from(islandEl.value, { y: -26, opacity: 0, duration: 0.6, delay: 0.35, ease: 'power3.out' })
@@ -4041,5 +4221,247 @@ onUnmounted(() => {
 @keyframes caret-blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
+}
+
+/* 让 Magic UI 的流光/光带「亮」起来：
+   1) 层级：MagicCard 内部 backdrop/z=1、content/z=3，ShineBorder 默认 auto 会被压在背景下面；
+      摄像头卡里 BorderBeam 是最前面的兄弟节点，会被后面的画面层盖住 —— 必须抬高
+   2) 辉光：2~3px 的渐变环在浅色卡面上太弱，补一层绿色 drop-shadow */
+.shine-border {
+  z-index: 4 !important;
+  filter: drop-shadow(0 0 4px rgba(23, 178, 106, 0.6));
+}
+
+.border-beam {
+  z-index: 3 !important;
+  filter: drop-shadow(0 0 6px rgba(23, 178, 106, 0.85));
+}
+
+/* ── Diagnosis History（诊断历史）────────────────────────────────── */.canvas-floating-toolbar {
+  .canvas-action-btn.ghost {
+    background: rgba(255, 255, 255, 0.92);
+    color: #1d2939;
+    border: 1px solid rgba(255, 255, 255, 0.4);
+
+    svg { width: 13px; height: 13px; }
+    &:hover { background: #ffffff; }
+  }
+}
+
+.canvas-right-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.history-modal-card {
+  .history-stat-chip {
+    margin-left: 10px;
+    font-size: 12px;
+    color: #05603a;
+    background: #e7f6ef;
+    border: 1px solid #bfe8d2;
+    border-radius: 999px;
+    padding: 2px 10px;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .history-body {
+    min-height: 220px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding: 12px 16px 16px;
+  }
+
+  .history-empty {
+    padding: 48px 0;
+    text-align: center;
+    color: #98a2b3;
+    font-size: 13px;
+  }
+
+  .history-retry-btn {
+    display: block;
+    margin: 10px auto 0;
+    padding: 4px 18px;
+    font-size: 12.5px;
+    border: 1px solid #d0d5dd;
+    background: #ffffff;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #344054;
+    &:hover { border-color: #17b26a; color: #0f9755; }
+  }
+
+  /* 列表 */
+  .history-list { display: flex; flex-direction: column; gap: 8px; }
+
+  .history-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid #eceef1;
+    border-radius: 8px;
+    cursor: pointer;
+    background: #ffffff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+
+    &:hover {
+      border-color: #9fe0bd;
+      box-shadow: 0 2px 8px rgba(23, 178, 106, 0.12);
+    }
+
+    .history-thumb {
+      width: 56px;
+      height: 44px;
+      object-fit: cover;
+      border-radius: 5px;
+      flex-shrink: 0;
+      background: #f2f4f7;
+    }
+
+    .history-thumb-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    .history-item-main { flex: 1; min-width: 0; }
+
+    .hi-row1 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      strong { font-size: 13px; color: #101828; }
+    }
+
+    .hi-row2 {
+      margin-top: 2px;
+      font-size: 11.5px;
+      color: #667085;
+    }
+
+    .history-item-time {
+      font-size: 11.5px;
+      color: #98a2b3;
+      white-space: nowrap;
+    }
+
+    .history-del-btn {
+      width: 22px;
+      height: 22px;
+      line-height: 20px;
+      text-align: center;
+      border: none;
+      border-radius: 50%;
+      background: transparent;
+      color: #c2c7cf;
+      cursor: pointer;
+      font-size: 12px;
+      flex-shrink: 0;
+      &:hover { background: #fee4e2; color: #b42318; }
+    }
+  }
+
+  /* 严重度徽标 */
+  .hi-sev {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 8px;
+
+    &[data-sev='健康'] { color: #067647; background: #e7f6ef; }
+    &[data-sev='轻度'] { color: #b54708; background: #fef0c7; }
+    &[data-sev='中度'] { color: #b93815; background: #ffead5; }
+    &[data-sev='重度'] { color: #b42318; background: #fee4e2; }
+  }
+
+  /* 详情 */
+  .history-detail-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+  }
+
+  .history-back-btn {
+    border: 1px solid #d0d5dd;
+    background: #ffffff;
+    border-radius: 6px;
+    padding: 3px 12px;
+    font-size: 12.5px;
+    color: #344054;
+    cursor: pointer;
+    &:hover { border-color: #17b26a; color: #0f9755; }
+  }
+
+  .history-detail-time { font-size: 12px; color: #98a2b3; }
+
+  .history-detail-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .history-img-box {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    background: #101418;
+    min-height: 150px;
+
+    img { width: 100%; display: block; }
+
+    .history-img-empty {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 150px;
+      color: #667085;
+      font-size: 12px;
+    }
+
+    .history-img-tag {
+      position: absolute;
+      left: 8px;
+      bottom: 8px;
+      font-size: 11px;
+      font-weight: 700;
+      color: #ffffff;
+      background: rgba(16, 24, 40, 0.72);
+      border-radius: 4px;
+      padding: 2px 8px;
+
+      &.cam { background: rgba(23, 178, 106, 0.85); }
+    }
+  }
+
+  .history-detail-rows {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+
+    .hrow {
+      display: flex;
+      gap: 12px;
+      font-size: 12.5px;
+      padding: 6px 10px;
+      background: #f9fafb;
+      border-radius: 6px;
+
+      span { width: 118px; flex-shrink: 0; color: #667085; }
+      strong { color: #101828; font-weight: 600; line-height: 1.5; }
+
+      &.rx strong { font-weight: 400; color: #344054; }
+
+      .hi-en { font-style: normal; color: #98a2b3; font-weight: 400; font-size: 11.5px; }
+      .hi-name strong, strong.hi-name { font-weight: 700; }
+    }
+  }
 }
 </style>
