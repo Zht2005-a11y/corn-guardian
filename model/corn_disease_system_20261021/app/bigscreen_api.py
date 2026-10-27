@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import base64
 import io
+import logging
 import math
 import os
 import random
@@ -19,8 +20,11 @@ from pydantic import BaseModel, Field
 from PIL import Image
 
 from src.config import load_config
+from src import session_store
 from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge
-from src.llm_client import ask_agnes, stream_ask_agnes
+from src.llm_client import ask_agnes, clear_session, stream_ask_agnes
+
+logger = logging.getLogger("corn_system.bigscreen_api")
 
 router = APIRouter(prefix="/screen", tags=["大屏可视化与综合诊断"])
 
@@ -489,7 +493,71 @@ async def chat_screen_stream(req: ChatRequest, request: Request):
 
 
 # ==========================================================================
-#  4. 示范区大田遥测数据与模型抗逆感知雷达指标
+#  4. 会话找回（历史会话列表 / 详情恢复 / 删除）
+# ==========================================================================
+# 复用 Claude Code 的 --resume/--continue 机制：会话以 append-only JSONL 落在
+# <system_root>/sessions/<sid>.jsonl（存储与恢复实现见 src/session_store.py，
+# 写入点在 llm_client.stream_ask_agnes 的 finally 增量追加）。
+# 前端灵动岛「历史会话」入口调本组接口；恢复时把该 session_id 交还给
+# /chat/stream，后端自动以磁盘 transcript 为基底续聊（含历史检索结果）。
+# ---------------------------------------------------------------------------
+# GET /screen/sessions —— 历史会话列表（--resume 选择器数据源）
+# 前端：Layout.vue 的 fetchSessionList()（灵动岛头部时钟图标打开列表时调用）
+# 入参：limit（缺省 50）
+# 依赖：src/session_store.list_sessions（stat mtime 降序 + 头尾 64KB 轻读标题，
+#       不做全量解析；标题优先级 lastPrompt > firstPrompt，interrupted 标记
+#       末轮是否被打断——检索完成未回答完等场景，提示用户可继续）
+# 返回：data.sessions[] {session_id, title, last_prompt, modified, created,
+#                        size_bytes, interrupted}
+# ---------------------------------------------------------------------------
+@router.get("/sessions")
+async def list_chat_sessions(limit: int = Query(50, ge=1, le=200, description="返回会话数上限")):
+    """历史问答会话列表，按最近修改时间倒序。"""
+    return {"code": 0, "message": "ok", "data": {"sessions": session_store.list_sessions(limit)}}
+
+
+# ---------------------------------------------------------------------------
+# GET /screen/sessions/{session_id} —— 会话详情（恢复展示用）
+# 前端：Layout.vue 的 restoreSession()（点击列表项时调用；成功后把该 session_id
+#       交还给 /chat/stream，即完成「找回」，无需专用恢复接口）
+# 依赖：src.session_store.read_rows / transcript_meta / transcript_display
+# 返回：data {session_id, messages[]（前端气泡格式 role=user|ai，searchQuery 为
+#        该回答引用过的联网检索词）, interrupted（末轮中断类型或 null）, message_count}
+# ---------------------------------------------------------------------------
+@router.get("/sessions/{session_id}")
+async def get_chat_session(session_id: str):
+    rows = session_store.read_rows(session_id)
+    if not rows:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    meta = session_store.transcript_meta(rows)
+    return {
+        "code": 0,
+        "message": "ok",
+        "data": {
+            "session_id": session_id,
+            "messages": session_store.transcript_display(rows),
+            "interrupted": meta["interrupted"],
+            "message_count": meta["message_count"],
+        },
+    }
+
+
+# ---------------------------------------------------------------------------
+# DELETE /screen/sessions/{session_id} —— 删除会话（磁盘 JSONL + 内存快照）
+# 前端：Layout.vue 的 removeSession()（列表项「确认删除」二次点击）
+# 依赖：src.session_store.delete_session；clear_session 同步清掉 llm_client 的
+#       内存快照，避免删了磁盘、内存里还留着 5 分钟 TTL 的旧上下文
+# 返回：data {deleted: bool}（磁盘无此文件但清过内存时仍返回 deleted=false）
+# ---------------------------------------------------------------------------
+@router.delete("/sessions/{session_id}")
+async def delete_chat_session(session_id: str):
+    deleted = session_store.delete_session(session_id)
+    clear_session(session_id)
+    return {"code": 0, "message": "ok", "data": {"deleted": deleted}}
+
+
+# ==========================================================================
+#  5. 示范区大田遥测数据与模型抗逆感知雷达指标
 # ==========================================================================
 # ---------------------------------------------------------------------------
 # GET /screen/telemetry —— 大屏遥测数据（微气候时序 / 病害分布 / 六维雷达）
