@@ -15,7 +15,7 @@
             </div>
           </div>
 
-          <!-- Upper Menu Navigation (4 icons: Home, Tower, Chart, Map) -->
+          <!-- Upper Menu Navigation (2 icons: Home, 病害图鉴) -->
           <div class="menu-container upper">
             <button
               class="nav-item-btn"
@@ -28,39 +28,16 @@
 
             <button
               class="nav-item-btn"
-              :class="{ active: activeNav === 'sensors' }"
-              @click="activeNav = 'sensors'; activeModal = 'device'"
-              title="物联网传感器"
+              :class="{ active: activeNav === 'knowledge' }"
+              @click="activeNav = 'knowledge'; openKnowledge()"
+              title="病害图鉴与防治知识库"
             >
-              <!-- Computer Tower / Server Icon -->
+              <!-- Book / Knowledge Base Icon -->
               <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
-                <rect x="5" y="2" width="10" height="16" rx="2"/>
-                <line x1="8" y1="5" x2="12" y2="5"/>
-                <line x1="8" y1="8" x2="12" y2="8"/>
-                <circle cx="10" cy="14" r="1" fill="#333333"/>
-              </svg>
-            </button>
-
-            <button
-              class="nav-item-btn"
-              :class="{ active: activeNav === 'charts' }"
-              @click="activeNav = 'charts'; activeModal = 'telemetry'"
-              title="遥测数据分析"
-            >
-              <img src="/tanee/svg/dashboard/icon-15.svg" alt="Charts" class="nav-svg-icon"/>
-            </button>
-
-            <button
-              class="nav-item-btn"
-              :class="{ active: activeNav === 'map' }"
-              @click="activeNav = 'map'; showDiagWorkstation = false"
-              title="田间地块地图"
-            >
-              <!-- Map Trifold Icon -->
-              <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
-                <path d="M2.5 4.5L7.5 2.5L12.5 4.5L17.5 2.5V15.5L12.5 17.5L7.5 15.5L2.5 17.5V4.5Z"/>
-                <line x1="7.5" y1="2.5" x2="7.5" y2="15.5"/>
-                <line x1="12.5" y1="4.5" x2="12.5" y2="17.5"/>
+                <path d="M3 4.5C3 3.7 3.7 3 4.5 3H9v14H4.5C3.7 17 3 16.3 3 15.5V4.5Z"/>
+                <path d="M17 4.5C17 3.7 16.3 3 15.5 3H11v14h4.5c.8 0 1.5-.7 1.5-1.5V4.5Z"/>
+                <line x1="5.5" y1="6.5" x2="7" y2="6.5"/>
+                <line x1="13" y1="6.5" x2="14.5" y2="6.5"/>
               </svg>
             </button>
           </div>
@@ -962,6 +939,70 @@
       </div>
     </div>
 
+    <!-- 病害图鉴 · 识别与防治知识库 Modal -->
+    <div class="modal-backdrop-blur" v-if="activeModal === 'knowledge'" @click.self="activeModal = null">
+      <div class="tanee-modal-card large">
+        <div class="t-modal-head">
+          <div class="head-title-flex">
+            <svg class="modal-head-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
+              <path d="M3 4.5C3 3.7 3.7 3 4.5 3H9v14H4.5C3.7 17 3 16.3 3 15.5V4.5Z"/>
+              <path d="M17 4.5C17 3.7 16.3 3 15.5 3H11v14h4.5c.8 0 1.5-.7 1.5-1.5V4.5Z"/>
+              <line x1="5.5" y1="6.5" x2="7" y2="6.5"/>
+              <line x1="13" y1="6.5" x2="14.5" y2="6.5"/>
+            </svg>
+            <h4>病害图鉴 · 识别与防治知识库</h4>
+          </div>
+          <button class="modal-close-btn" @click="activeModal = null">✕</button>
+        </div>
+        <div class="t-modal-body kb-layout">
+          <div class="kb-side">
+            <button
+              v-for="k in knowledgeItems"
+              :key="k.class_name_en"
+              class="kb-side-item"
+              :class="{ active: knowledgeActiveId === k.class_name_en }"
+              @click="knowledgeActiveId = k.class_name_en"
+            >
+              <span class="kb-dot" :style="{ background: k.color }"></span>
+              {{ k.name_cn }}
+            </button>
+          </div>
+          <div class="kb-detail" v-if="currentKnowledge">
+            <div class="kb-hero" :style="{ borderLeftColor: currentKnowledge.color }">
+              <img v-if="kbSampleImg" :src="kbSampleImg" class="kb-hero-img" alt="病害样本图"/>
+              <div class="kb-hero-info">
+                <h3>{{ currentKnowledge.name_cn }}</h3>
+                <p class="kb-en">{{ currentKnowledge.name_en }}</p>
+                <p class="kb-pathogen">病原：{{ currentKnowledge.pathogen }}</p>
+                <span class="kb-severity" v-if="currentKnowledge.severity">危害程度：{{ currentKnowledge.severity }}</span>
+              </div>
+            </div>
+            <div class="kb-section" v-if="currentKnowledge.symptoms?.length">
+              <h5>典型症状</h5>
+              <ul><li v-for="(s, i) in currentKnowledge.symptoms" :key="'sy' + i">{{ s }}</li></ul>
+            </div>
+            <div class="kb-section" v-if="currentKnowledge.occurrence?.length">
+              <h5>发生规律</h5>
+              <ul><li v-for="(s, i) in currentKnowledge.occurrence" :key="'oc' + i">{{ s }}</li></ul>
+            </div>
+            <div class="kb-section" v-if="currentKnowledge.control?.chemical?.length">
+              <h5>飞防处方</h5>
+              <ul class="kb-rx"><li v-for="(s, i) in currentKnowledge.control.chemical" :key="'rx' + i">{{ s }}</li></ul>
+            </div>
+            <div class="kb-section" v-if="currentKnowledge.control?.agricultural?.length">
+              <h5>农艺防治</h5>
+              <ul><li v-for="(s, i) in currentKnowledge.control.agricultural" :key="'ag' + i">{{ s }}</li></ul>
+            </div>
+            <div class="kb-section" v-if="currentKnowledge.control?.field?.length">
+              <h5>田间管理</h5>
+              <ul><li v-for="(s, i) in currentKnowledge.control.field" :key="'fi' + i">{{ s }}</li></ul>
+            </div>
+          </div>
+          <div class="kb-empty" v-else>知识库加载中…</div>
+        </div>
+      </div>
+    </div>
+
     <!-- Personal Center Modal（个人中心） -->
     <div class="modal-backdrop-blur" v-if="activeModal === 'profile'" @click.self="activeModal = null">
       <div class="tanee-modal-card profile-modal-card">
@@ -1294,6 +1335,35 @@ async function loadSamples() {
     }
   } catch (e) {
     console.error('加载预置样本失败:', e)
+  }
+}
+
+// ── 病害图鉴（知识库弹窗）：数据与 /predict 决策卡同源（后端 knowledge_base.py） ──
+const knowledgeItems = ref([])
+const knowledgeActiveId = ref('')
+const knowledgeLoaded = ref(false)
+const currentKnowledge = computed(
+  () => knowledgeItems.value.find(k => k.class_name_en === knowledgeActiveId.value) || null
+)
+const kbSampleImg = computed(() => {
+  if (!currentKnowledge.value) return ''
+  const s = presetSamples.value.find(p => p.class_name_en === currentKnowledge.value.class_name_en)
+  return s?.imgData || ''
+})
+
+async function openKnowledge() {
+  activeModal.value = 'knowledge'
+  if (!knowledgeLoaded.value) {
+    try {
+      const res = await axios.get('/api/screen/knowledge')
+      knowledgeItems.value = res.data?.data || []
+      knowledgeLoaded.value = true
+    } catch (e) {
+      console.error('加载病害知识库失败:', e)
+    }
+  }
+  if (!knowledgeActiveId.value && knowledgeItems.value.length) {
+    knowledgeActiveId.value = knowledgeItems.value[0].class_name_en
   }
 }
 
@@ -3272,6 +3342,149 @@ onUnmounted(() => {
       .chart-tile-box {
         h5 { margin: 0 0 10px 0; font-size: 13px; color: #333333; }
         .chart-canvas-div { width: 100%; height: 260px; }
+      }
+    }
+
+    &.kb-layout {
+      display: grid;
+      grid-template-columns: 168px 1fr;
+      gap: 0;
+      padding: 0;
+      height: 480px;
+
+      .kb-side {
+        border-right: 1px solid #ebebeb;
+        background: #f8f8f8;
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+
+        .kb-side-item {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          border: none;
+          background: none;
+          padding: 10px 12px;
+          border-radius: 8px;
+          font-size: 13px;
+          color: #525866;
+          cursor: pointer;
+          text-align: left;
+          transition: background 0.15s ease, color 0.15s ease;
+
+          &:hover { background: #ececec; }
+
+          &.active {
+            background: #ffffff;
+            color: #333333;
+            font-weight: 600;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+          }
+
+          .kb-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 99999px;
+            flex-shrink: 0;
+          }
+        }
+      }
+
+      .kb-detail {
+        padding: 16px 20px 20px;
+        overflow-y: auto;
+        display: flex;
+        flex-direction: column;
+        gap: 14px;
+
+        .kb-hero {
+          display: flex;
+          gap: 14px;
+          padding: 12px;
+          border: 1px solid #ebebeb;
+          border-left: 4px solid #17b26a;
+          border-radius: 8px;
+          background: #ffffff;
+
+          .kb-hero-img {
+            width: 132px;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 8px;
+            flex-shrink: 0;
+            background: #f4f4f4;
+          }
+
+          .kb-hero-info {
+            min-width: 0;
+
+            h3 { margin: 0 0 4px; font-size: 16px; color: #333333; }
+            .kb-en { margin: 0 0 6px; font-size: 11px; color: #a4a4a4; letter-spacing: 0.3px; }
+            .kb-pathogen { margin: 0 0 8px; font-size: 12px; color: #525866; line-height: 1.6; }
+            .kb-severity {
+              display: inline-block;
+              font-size: 11px;
+              color: #8a6116;
+              background: rgba(249, 173, 25, 0.12);
+              border: 1px solid rgba(249, 173, 25, 0.45);
+              padding: 2px 8px;
+              border-radius: 99999px;
+            }
+          }
+        }
+
+        .kb-section {
+          h5 {
+            margin: 0 0 6px;
+            font-size: 13px;
+            color: #333333;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+
+            &::before {
+              content: '';
+              width: 4px;
+              height: 12px;
+              border-radius: 2px;
+              background: linear-gradient(180deg, #35c56e, #2e9055);
+            }
+          }
+
+          ul { margin: 0; padding: 0; list-style: none; }
+
+          li {
+            position: relative;
+            padding-left: 14px;
+            font-size: 12px;
+            color: #525866;
+            line-height: 1.7;
+            margin-bottom: 4px;
+
+            &::before {
+              content: '';
+              position: absolute;
+              left: 2px;
+              top: 8px;
+              width: 5px;
+              height: 5px;
+              border-radius: 50%;
+              background: #dcdcdc;
+            }
+          }
+
+          &.kb-rx li::before { background: #f9ad19; }
+        }
+      }
+
+      .kb-empty {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 13px;
+        color: #a4a4a4;
       }
     }
   }

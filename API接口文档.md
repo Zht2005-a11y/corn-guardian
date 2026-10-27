@@ -109,6 +109,7 @@ app/bigscreen_api.py:24  APIRouter(prefix="/screen")
 | 2 | POST | `/screen/predict` | `/api/screen/predict` | ✅ | 大屏 |
 | 3 | POST | `/screen/chat` | `/api/screen/chat` | ✅ | 大屏 |
 | 4 | GET | `/screen/telemetry` | `/api/screen/telemetry` | ✅ | 大屏 |
+| 4b | GET | `/screen/knowledge` | `/api/screen/knowledge` | ✅（侧边栏「病害图鉴」弹窗） | 大屏 |
 | 5 | GET | `/` | — | ❌ | 基础 |
 | 6 | GET | `/health` | — | ❌ | 基础 |
 | 7 | GET | `/models` | — | ❌ | 基础 |
