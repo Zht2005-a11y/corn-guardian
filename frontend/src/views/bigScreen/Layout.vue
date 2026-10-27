@@ -998,7 +998,14 @@
               <ul><li v-for="(s, i) in currentKnowledge.control.field" :key="'fi' + i">{{ s }}</li></ul>
             </div>
           </div>
-          <div class="kb-empty" v-else>知识库加载中…</div>
+          <div class="kb-empty" v-else>
+            <template v-if="knowledgeLoading">知识库加载中…</template>
+            <template v-else-if="knowledgeError">
+              <p class="kb-error-text">{{ knowledgeError }}</p>
+              <button class="kb-retry-btn" @click="loadKnowledge()">重试</button>
+            </template>
+            <template v-else>暂无知识库数据</template>
+          </div>
         </div>
       </div>
     </div>
@@ -1342,6 +1349,8 @@ async function loadSamples() {
 const knowledgeItems = ref([])
 const knowledgeActiveId = ref('')
 const knowledgeLoaded = ref(false)
+const knowledgeLoading = ref(false)
+const knowledgeError = ref('')
 const currentKnowledge = computed(
   () => knowledgeItems.value.find(k => k.class_name_en === knowledgeActiveId.value) || null
 )
@@ -1351,19 +1360,30 @@ const kbSampleImg = computed(() => {
   return s?.imgData || ''
 })
 
+async function loadKnowledge() {
+  knowledgeLoading.value = true
+  knowledgeError.value = ''
+  try {
+    const res = await axios.get('/api/screen/knowledge')
+    knowledgeItems.value = res.data?.data || []
+    knowledgeLoaded.value = true
+    if (!knowledgeActiveId.value && knowledgeItems.value.length) {
+      knowledgeActiveId.value = knowledgeItems.value[0].class_name_en
+    }
+  } catch (e) {
+    console.error('加载病害知识库失败:', e)
+    knowledgeError.value = e?.response?.status === 404
+      ? '知识库接口不存在（404）：后端可能未重启到包含 /screen/knowledge 的最新代码'
+      : '知识库加载失败：无法连接后端服务，请确认 run_backend.bat 已启动'
+  } finally {
+    knowledgeLoading.value = false
+  }
+}
+
 async function openKnowledge() {
   activeModal.value = 'knowledge'
-  if (!knowledgeLoaded.value) {
-    try {
-      const res = await axios.get('/api/screen/knowledge')
-      knowledgeItems.value = res.data?.data || []
-      knowledgeLoaded.value = true
-    } catch (e) {
-      console.error('加载病害知识库失败:', e)
-    }
-  }
-  if (!knowledgeActiveId.value && knowledgeItems.value.length) {
-    knowledgeActiveId.value = knowledgeItems.value[0].class_name_en
+  if (!knowledgeLoaded.value && !knowledgeLoading.value) {
+    await loadKnowledge()
   }
 }
 
@@ -3481,10 +3501,28 @@ onUnmounted(() => {
 
       .kb-empty {
         display: flex;
+        flex-direction: column;
         align-items: center;
         justify-content: center;
+        gap: 10px;
         font-size: 13px;
         color: #a4a4a4;
+        text-align: center;
+        padding: 0 24px;
+
+        .kb-error-text { margin: 0; line-height: 1.6; }
+
+        .kb-retry-btn {
+          border: none;
+          cursor: pointer;
+          color: #ffffff;
+          font-size: 13px;
+          padding: 7px 22px;
+          border-radius: 8px;
+          background: linear-gradient(135deg, #35c56e, #2e9055);
+
+          &:hover { filter: brightness(1.05); }
+        }
       }
     }
   }
