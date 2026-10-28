@@ -92,20 +92,21 @@
             <h1 class="header-title">玉米叶部病斑多尺度自适应感知与飞防决策系统</h1>
 
             <div class="header-right-tools">
-              <!-- 3 Alert Button (Figma Exact: 110x32, gradient #666 to #1a1a1a, radius 8px)
-                   Magic UI · PulsatingButton — 告警呼吸光环 -->
+              <!-- 告警按钮：数量来自 /screen/alerts（诊断自动生成），不再是写死的 3 条
+                   Magic UI · PulsatingButton — 有未读时才呼吸 -->
               <PulsatingButton
                 class="alerts-pill-btn"
+                :class="{ 'has-unread': alertStats.unread > 0 }"
                 pulse-color="rgba(23, 178, 106, 0.55)"
                 duration="1.8s"
                 distance="10px"
-                @click="activeModal = 'alerts'"
+                @click="openAlerts"
                 title="农场告警"
               >
                 <div class="notif-box">
                   <img src="/tanee/svg/dashboard/icon-7.svg" alt="告警" class="bell-svg"/>
                 </div>
-                <span class="alerts-txt">3 条告警</span>
+                <span class="alerts-txt">{{ alertStats.unread }} 条告警</span>
                 <svg class="arrow-up-right-svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 12L12 4M12 4H6M12 4V10"/>
                 </svg>
@@ -910,37 +911,47 @@
 
     <!-- ════════════════════ 3. INTERACTIVE DRAWERS & MODALS ════════════════════ -->
 
-    <!-- Alerts Drawer (3 Alerts) -->
+    <!-- Alerts Drawer（告警来自 /screen/alerts，由诊断结果自动生成） -->
     <div class="modal-backdrop-blur" v-if="activeModal === 'alerts'" @click.self="activeModal = null">
-      <div class="tanee-modal-card">
+      <div class="tanee-modal-card alerts-modal-card">
         <div class="t-modal-head">
           <div class="head-title-flex">
             <img src="/tanee/svg/dashboard/icon-7.svg" alt="Alert" class="modal-head-icon"/>
-            <h4>3 条活跃告警</h4>
+            <h4>{{ alertStats.unread }} 条未读告警</h4>
+            <span class="alerts-total-chip">今日 {{ alertStats.today }} · 共 {{ alertStats.total }}</span>
           </div>
           <button class="modal-close-btn" @click="activeModal = null">✕</button>
         </div>
-        <div class="t-modal-body">
-          <div class="alert-box-item warning">
-            <div class="alert-item-head">
-              <strong>⚠️ 湿度传感器 HIH-9370 信号中断</strong>
-              <span class="alert-time">08:02 AM</span>
-            </div>
-            <p>Smart Farm 01 温室 08 号分区传感器上报链路抖动，当前采用临界均值补插算法填补空缺遥测点。</p>
+        <div class="t-modal-body alerts-body">
+          <div class="alerts-toolbar">
+            <button class="alerts-tool-btn" :disabled="!alertStats.unread" @click="markAllAlertsRead">
+              全部标为已读
+            </button>
+            <button class="alerts-tool-btn ghost" @click="loadAlerts">刷新</button>
+            <label class="alerts-filter">
+              <input type="checkbox" v-model="alertsUnreadOnly" @change="loadAlerts"/>
+              只看未读
+            </label>
           </div>
-          <div class="alert-box-item urgent">
-            <div class="alert-item-head">
-              <strong>🚨 Plot PL-02J 玉米灰斑病菌孢子负荷预警</strong>
-              <span class="alert-time">09:15 AM</span>
-            </div>
-            <p>空气孢子捕捉量突破 124 粒/m³，叶面结露持续超 6.5 小时，已进入初侵染高危敏感窗口期！</p>
+
+          <div v-if="alertsLoading" class="alerts-empty">正在加载告警...</div>
+          <div v-else-if="alertsError" class="alerts-empty">{{ alertsError }}</div>
+          <div v-else-if="!alerts.length" class="alerts-empty">
+            暂无告警 —— 每次诊断会自动按规则生成（重病斑 / 低置信度 / 扩散风险）
           </div>
-          <div class="alert-box-item info">
-            <div class="alert-item-head">
-              <strong>ℹ️ 滴灌水肥一体机自动注液平衡完成</strong>
-              <span class="alert-time">07:30 AM</span>
+
+          <div v-else class="alerts-list">
+            <div v-for="a in alerts" :key="a.id" class="alert-box-item" :class="alertLevelClass(a.level)" :style="{ opacity: a.isRead ? 0.62 : 1 }">
+              <div class="alert-item-head">
+                <strong>{{ alertIcon(a.level) }} {{ a.title }}</strong>
+                <span class="alert-time">{{ fmtTime(a.created_at) }}</span>
+              </div>
+              <p>{{ a.detail }}</p>
+              <div class="alert-actions">
+                <button v-if="!a.isRead" class="alert-action-btn" @click="markAlertRead(a)">标为已读</button>
+                <button class="alert-action-btn danger" @click="removeAlert(a)">删除</button>
+              </div>
             </div>
-            <p>已向根际灌注螯合微肥 50g/株，实测土壤 pH 值由 7.8 稳定调整至标准适宜区间 7.6。</p>
           </div>
         </div>
       </div>
@@ -1744,11 +1755,85 @@ async function runDetect() {
       isDetected.value = true
       inferenceSpeed.value = data.inference_ms + 'ms'
       refreshHistoryStats()
+      refreshAlertStats()
     }
   } catch (err) {
     console.error('推理检测失败:', err)
   } finally {
     isDetecting.value = false
+  }
+}
+
+// ── Alerts（诊断自动生成 · /screen/alerts）────────────────────────────
+const alerts = ref([])
+const alertStats = ref({ unread: 0, total: 0, today: 0 })
+const alertsLoading = ref(false)
+const alertsError = ref('')
+const alertsUnreadOnly = ref(false)
+
+const alertLevelClass = (level) => (level === 'urgent' ? 'urgent' : level === 'warning' ? 'warning' : 'info')
+const alertIcon = (level) => (level === 'urgent' ? '🚨' : level === 'warning' ? '⚠️' : 'ℹ️')
+
+async function loadAlerts() {
+  alertsLoading.value = true
+  alertsError.value = ''
+  try {
+    const res = await axios.get('/api/screen/alerts', {
+      params: { limit: 50, unread_only: alertsUnreadOnly.value },
+    })
+    const d = res.data?.data
+    if (d) {
+      alerts.value = d.items || []
+      alertStats.value = d.stats || { unread: 0, total: 0, today: 0 }
+    }
+  } catch (err) {
+    console.error('告警加载失败:', err)
+    alertsError.value = '告警加载失败，请检查后端服务'
+  } finally {
+    alertsLoading.value = false
+  }
+}
+
+// 只刷未读数（诊断结束后调用，避免每次拉全量列表）
+// 后端刚重启时首个请求可能失败，重试一次；失败不打扰界面
+async function refreshAlertStats(retry = 1) {
+  try {
+    const res = await axios.get('/api/screen/alerts', { params: { limit: 1 } })
+    if (res.data?.data?.stats) alertStats.value = res.data.data.stats
+  } catch {
+    if (retry > 0) setTimeout(() => refreshAlertStats(retry - 1), 1500)
+  }
+}
+
+function openAlerts() {
+  activeModal.value = 'alerts'
+  loadAlerts()
+}
+
+async function markAlertRead(a) {
+  try {
+    await axios.post(`/api/screen/alerts/${a.id}/read`)
+    await loadAlerts()
+  } catch (err) {
+    console.error('标记告警失败:', err)
+  }
+}
+
+async function markAllAlertsRead() {
+  try {
+    await axios.post('/api/screen/alerts/read-all')
+    await loadAlerts()
+  } catch (err) {
+    console.error('全部已读失败:', err)
+  }
+}
+
+async function removeAlert(a) {
+  try {
+    await axios.delete(`/api/screen/alerts/${a.id}`)
+    await loadAlerts()
+  } catch (err) {
+    console.error('删除告警失败:', err)
   }
 }
 
@@ -1826,6 +1911,7 @@ const batchRunning = ref(false)
 const batchElapsed = ref(0)
 const batchError = ref('')
 let batchTimer = null
+let alertPollTimer = null
 
 // 严重度带描述（"危急 (IV 级暴发期)"），徽标只显示档位词
 function sevKey(severity) {
@@ -2354,6 +2440,8 @@ onMounted(() => {
   loadSamples()
   restartCarousel()
   refreshHistoryStats() // 个人中心「今日诊断」用真实计数
+  refreshAlertStats() // 顶部告警胶囊的未读数
+  alertPollTimer = setInterval(refreshAlertStats, 60000)
   // 灵动岛入场：从顶部缓缓落下
   if (islandEl.value) {
     gsap.from(islandEl.value, { y: -26, opacity: 0, duration: 0.6, delay: 0.35, ease: 'power3.out' })
@@ -2365,6 +2453,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  clearInterval(alertPollTimer)
   clearInterval(carouselTimer)
   cancelSnapBack()
   if (islandTween) islandTween.kill()
@@ -5260,6 +5349,98 @@ onUnmounted(() => {
       background: #fef3f2;
       border-radius: 6px;
       padding: 5px 9px;
+    }
+  }
+}
+/* ── Alerts（真实告警）───────────────────────────────────────────── */
+/* 没有未读告警时不再呼吸，避免"一直闪但没内容" */
+.alerts-pill-btn:not(.has-unread) :deep(.pulsating-button__pulse) {
+  animation: none;
+  opacity: 0;
+}
+
+.alerts-modal-card {
+  .alerts-total-chip {
+    margin-left: 10px;
+    font-size: 11.5px;
+    color: #475467;
+    background: #f2f4f7;
+    border-radius: 999px;
+    padding: 2px 10px;
+    white-space: nowrap;
+  }
+
+  .alerts-body {
+    max-height: 62vh;
+    overflow-y: auto;
+    padding: 12px 16px 16px;
+  }
+
+  .alerts-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .alerts-tool-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #344054;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { border-color: #17b26a; color: #0f9755; }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &.ghost { background: #f9fafb; }
+  }
+
+  .alerts-filter {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #475467;
+    cursor: pointer;
+
+    input { accent-color: #17b26a; }
+  }
+
+  .alerts-empty {
+    padding: 46px 0;
+    text-align: center;
+    font-size: 12.5px;
+    color: #98a2b3;
+  }
+
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .alert-box-item {
+    .alert-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .alert-action-btn {
+      padding: 2px 10px;
+      font-size: 11.5px;
+      border-radius: 5px;
+      border: 1px solid #d0d5dd;
+      background: #ffffff;
+      color: #475467;
+      cursor: pointer;
+
+      &:hover { border-color: #98a2b3; }
+      &.danger { color: #b42318; border-color: #fda29b; }
+      &.danger:hover { background: #fef3f2; }
     }
   }
 }

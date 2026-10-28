@@ -173,6 +173,23 @@ def list_records(limit: int = 50, offset: int = 0) -> Tuple[List[Dict[str, Any]]
     return items, stats
 
 
+def count_today_by_class(class_en: str) -> int:
+    """统计今天某个病害类别已诊断的次数（用于扩散风险告警）。"""
+    try:
+        today = datetime.now().strftime("%Y-%m-%d")
+        with _lock, _conn() as conn:
+            _ensure_schema(conn)
+            return int(
+                conn.execute(
+                    "SELECT COUNT(*) FROM diagnosis_history WHERE class_en = ? AND created_at LIKE ?",
+                    (class_en, today + "%"),
+                ).fetchone()[0]
+            )
+    except Exception as e:  # noqa: BLE001
+        logger.warning("count_today_by_class failed: %s", e)
+        return 0
+
+
 def get_record(rid: int) -> Optional[Dict[str, Any]]:
     """单条详情：含热力图、飞防参数 JSON。"""
     with _lock, _conn() as conn:
