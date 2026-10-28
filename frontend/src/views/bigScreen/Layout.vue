@@ -46,11 +46,11 @@
             <button
               class="nav-item-btn"
               :class="{ active: activeNav === 'decision' }"
-              @click="activeNav = 'decision'"
-              title="飞防决策"
+              @click="activeNav = 'decision'; activeModal = 'djiShop'"
+              title="无人机推荐 · DJI 商城"
             >
               <el-icon :size="20"><Aim /></el-icon>
-              <span class="nav-label">飞防决策</span>
+              <span class="nav-label">无人机推荐</span>
             </button>
 
             <button
@@ -1319,6 +1319,13 @@
         </div>
       </div>
     </div>
+
+    <!-- Drone Recommendation Modal（无人机推荐 · DJI 商城）
+         完整复刻大疆商城风格的商品详情页：版本切换 / 价格同步 / 官方购买跳转 / 购物车 / 收藏
+         弹窗特效：与病害图鉴同款 hero-video-dialog spring 编排（v-if 必须放在 Transition 内部才能触发进入/离开动画） -->
+    <Transition :css="false" @enter="onKbDialogEnter" @leave="onKbDialogLeave">
+      <DjiAir3Shop v-if="activeModal === 'djiShop'" @close="activeModal = null" />
+    </Transition>
   </div>
 </template>
 
@@ -1337,6 +1344,7 @@ import NumberTicker from '@/components/effects/magicui/NumberTicker.vue'
 import ShineBorder from '@/components/effects/magicui/ShineBorder.vue'
 import BorderBeam from '@/components/effects/magicui/BorderBeam.vue'
 import PulsatingButton from '@/components/effects/magicui/PulsatingButton.vue'
+import DjiAir3Shop from './DjiAir3Shop.vue'
 
 // ── State ─────────────────────────────────────────────────────────────
 const activeNav = ref('home')
@@ -1675,7 +1683,8 @@ async function openKnowledge() {
 // React 版的 AnimatePresence + motion.div 对应 Vue 的 <Transition :css="false"> + motion 的
 // animate()（与 NumberTicker.vue 同一依赖通道）。
 async function onKbDialogEnter(el, done) {
-  const card = el.querySelector('.tanee-modal-card')
+  // 同时兼容病害图鉴卡片与无人机推荐弹窗卡片
+  const card = el.querySelector('.tanee-modal-card, .dji-shop-card')
   if (!card || typeof animate !== 'function') { done(); return }
   // 起始态在本帧绘制前内联写死，避免弹窗闪现原始尺寸
   el.style.opacity = '0'
@@ -1695,7 +1704,7 @@ async function onKbDialogEnter(el, done) {
 }
 
 async function onKbDialogLeave(el, done) {
-  const card = el.querySelector('.tanee-modal-card')
+  const card = el.querySelector('.tanee-modal-card, .dji-shop-card')
   if (!card || typeof animate !== 'function') { done(); return }
   try {
     await Promise.all([
