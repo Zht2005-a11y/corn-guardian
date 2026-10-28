@@ -151,6 +151,51 @@
                   </svg>
                 </button>
               </div>
+
+              <!-- 当前登录用户：头像点开显示账号信息 + 退出登录（认证状态见 stores/auth.js） -->
+              <div class="user-menu-wrap">
+                <button
+                  class="user-avatar-btn"
+                  :class="{ active: userMenuOpen }"
+                  @click.stop="userMenuOpen = !userMenuOpen"
+                  :title="`${auth.displayName}${auth.roleLabel ? ' · ' + auth.roleLabel : ''}`"
+                >
+                  <span class="avatar-initials">{{ auth.initials }}</span>
+                  <span class="avatar-presence"></span>
+                </button>
+
+                <transition name="pop-fade">
+                  <div v-if="userMenuOpen" class="user-popover">
+                    <div class="user-popover-head">
+                      <span class="user-popover-avatar">{{ auth.initials }}</span>
+                      <div class="user-popover-meta">
+                        <strong>{{ auth.displayName }}</strong>
+                        <span>{{ userMetaLine }}</span>
+                      </div>
+                    </div>
+
+                    <div class="user-popover-rows">
+                      <div class="user-popover-row">
+                        <span>账号</span>
+                        <b>{{ auth.user?.username || '--' }}</b>
+                      </div>
+                      <div class="user-popover-row">
+                        <span>上次登录</span>
+                        <b>{{ auth.user?.last_login_at || '首次登录' }}</b>
+                      </div>
+                    </div>
+
+                    <button class="user-logout-btn" @click="handleLogout">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                        <path d="M6.5 3H3.8A1.8 1.8 0 002 4.8v6.4A1.8 1.8 0 003.8 13h2.7" stroke-linecap="round"/>
+                        <path d="M10.5 5.5L13 8l-2.5 2.5M13 8H6.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <span>退出登录</span>
+                    </button>
+                  </div>
+                </transition>
+                <div v-if="userMenuOpen" class="user-popover-mask" @click="userMenuOpen = false"></div>
+              </div>
             </div>
           </header>
 
@@ -1307,6 +1352,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { Aim, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
@@ -1316,6 +1362,8 @@ import * as echarts from 'echarts'
 // 替代手写的字符级 fade 后处理（对齐 Vercel Streamdown / ChatGPT 的渐变吐字效果）
 import { Streamdown } from '@brucekit/streamdown-vue'
 import '@brucekit/streamdown-vue/styles.css'
+import { useAuthStore } from '@/stores/auth'
+import { authToken, redirectToLogin } from '@/utils/http'
 
 // ── Magic UI effects (shadcn registry · @magicui) ─────────────────────
 import MagicCard from '@/components/effects/magicui/MagicCard.vue'
@@ -1331,6 +1379,25 @@ const activeModal = ref(null)
 const showDiagWorkstation = ref(false)
 const scaleFactor = ref(1)
 const boardWidth = ref(1194)
+
+// ── 登录用户（令牌与用户信息由 stores/auth.js 管理）─────────────────────
+const router = useRouter()
+const auth = useAuthStore()
+const userMenuOpen = ref(false)
+
+// 显示名与角色同名时（如 admin 的「系统管理员」）副标题改显示账号，避免两行重复
+const userMetaLine = computed(() => {
+  const role = auth.roleLabel || ''
+  const name = auth.displayName || ''
+  if (!role || role === name) return auth.user?.username ? `@${auth.user.username}` : '已登录'
+  return role
+})
+
+async function handleLogout() {
+  userMenuOpen.value = false
+  await auth.logout()
+  router.replace({ path: '/login', query: { reason: '已退出登录' } })
+}
 
 const currentSector = ref('菠菜园 08 区')
 const presetSamples = ref([])
@@ -2298,9 +2365,14 @@ async function sendMessage() {
   try {
     // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
     chatAbort = new AbortController()
+    const sseToken = authToken()
     const response = await fetch('/api/screen/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // 原生 fetch 不走 axios 拦截器，令牌要手动带上
+        ...(sseToken ? { Authorization: `Bearer ${sseToken}` } : {})
+      },
       signal: chatAbort.signal,
       body: JSON.stringify({
         message: query,
@@ -2320,6 +2392,11 @@ async function sendMessage() {
         }
       })
     })
+
+    if (response.status === 401) {
+      redirectToLogin('登录状态已失效，请重新登录')
+      return
+    }
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -2547,6 +2624,7 @@ function handleResize() {
 onMounted(() => {
   handleResize()
   window.addEventListener('resize', handleResize)
+  auth.fetchMe() // 用本地令牌换最新的用户信息（角色、上次登录时间）
   loadSamples()
   restartCarousel()
   refreshHistoryStats() // 历史弹窗顶部「今日 N 次 · 共 M 条」
@@ -2938,6 +3016,174 @@ onUnmounted(() => {
       height: 12px;
     }
   }
+}
+
+/* ── 当前登录用户：头像按钮 + 账号弹层 ───────────────────────────────── */
+.user-menu-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-avatar-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(46, 144, 85, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(46, 144, 85, 0.34);
+  }
+
+  &.active {
+    box-shadow: 0 0 0 3px rgba(53, 197, 110, 0.2);
+  }
+
+  .avatar-presence {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #17b26a;
+    border: 2px solid #ffffff;
+  }
+}
+
+.user-popover {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 236px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(24, 27, 37, 0.06);
+  box-shadow: 0 16px 40px rgba(24, 27, 37, 0.16);
+  z-index: 90;
+}
+
+.user-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .user-popover-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .user-popover-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+
+    strong {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #181b25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    span {
+      font-size: 11.5px;
+      color: #8d8d8d;
+    }
+  }
+}
+
+.user-popover-rows {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.user-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+
+  span {
+    color: #a4a4a4;
+    flex-shrink: 0;
+  }
+
+  b {
+    font-weight: 600;
+    color: #333333;
+    text-align: right;
+  }
+}
+
+.user-logout-btn {
+  margin-top: 12px;
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #f5dedb;
+  background: #fef5f4;
+  color: #cf3a28;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: #fdeceb;
+    border-color: #f1cbc6;
+  }
+}
+
+/* 透明遮罩：点画板任意位置收起弹层（画板有 transform，fixed 会相对画板铺满） */
+.user-popover-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: transparent;
 }
 
 /* 2.2 Main Content Layout (16px Padding, 2 Columns) */
