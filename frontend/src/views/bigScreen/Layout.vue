@@ -15,8 +15,8 @@
             </div>
           </div>
 
-          <!-- Upper Menu Navigation (2 icons: Home, 病害图鉴) -->
-          <div class="menu-container upper">
+          <!-- Main Navigation -->
+          <nav class="menu-container upper">
             <button
               class="nav-item-btn"
               :class="{ active: activeNav === 'home' }"
@@ -24,6 +24,7 @@
               title="总览仪表盘"
             >
               <img src="/tanee/svg/dashboard/icon-16.svg" alt="Home" class="nav-svg-icon white-filter"/>
+              <span class="nav-label">首页</span>
             </button>
 
             <button
@@ -33,26 +34,67 @@
               title="病害图鉴与防治知识库"
             >
               <!-- Book / Knowledge Base Icon -->
-              <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
+              <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                 <path d="M3 4.5C3 3.7 3.7 3 4.5 3H9v14H4.5C3.7 17 3 16.3 3 15.5V4.5Z"/>
                 <path d="M17 4.5C17 3.7 16.3 3 15.5 3H11v14h4.5c.8 0 1.5-.7 1.5-1.5V4.5Z"/>
                 <line x1="5.5" y1="6.5" x2="7" y2="6.5"/>
                 <line x1="13" y1="6.5" x2="14.5" y2="6.5"/>
               </svg>
+              <span class="nav-label">病害图鉴</span>
             </button>
-          </div>
+
+            <button
+              class="nav-item-btn"
+              :class="{ active: activeNav === 'monitor' }"
+              @click="activeNav = 'monitor'"
+              title="监测数据"
+            >
+              <el-icon :size="20"><DataLine /></el-icon>
+              <span class="nav-label">监测数据</span>
+            </button>
+
+            <button
+              class="nav-item-btn"
+              :class="{ active: activeNav === 'decision' }"
+              @click="activeNav = 'decision'"
+              title="飞防决策"
+            >
+              <el-icon :size="20"><Aim /></el-icon>
+              <span class="nav-label">飞防决策</span>
+            </button>
+
+            <button
+              class="nav-item-btn"
+              :class="{ active: activeNav === 'history' }"
+              @click="activeNav = 'history'"
+              title="历史记录"
+            >
+              <el-icon :size="20"><Clock /></el-icon>
+              <span class="nav-label">历史记录</span>
+            </button>
+
+            <button
+              class="nav-item-btn"
+              :class="{ active: activeNav === 'settings' }"
+              @click="activeNav = 'settings'"
+              title="系统设置"
+            >
+              <el-icon :size="20"><Setting /></el-icon>
+              <span class="nav-label">系统设置</span>
+            </button>
+          </nav>
 
           <!-- Lower Menu Navigation (Pinned to bottom: Theme, User) -->
           <div class="menu-container lower">
             <div class="theme-menu-wrap">
               <button
-                class="nav-item-btn"
+                class="nav-tile-btn"
                 :class="{ active: themeMenuOpen }"
                 @click.stop="themeMenuOpen = !themeMenuOpen"
                 title="切换界面配色"
               >
                 <!-- Sun / Brightness Icon -->
-                <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
+                <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                   <circle cx="10" cy="10" r="3"/>
                   <path d="M10 2V4M10 16V18M2 10H4M16 10H18M4.34 4.34L5.76 5.76M14.24 14.24L15.66 15.66M4.34 15.66L5.76 14.24M14.24 5.76L15.66 4.34"/>
                 </svg>
@@ -79,8 +121,13 @@
               <div v-if="themeMenuOpen" class="theme-popover-mask" @click="themeMenuOpen = false"></div>
             </div>
 
-            <button class="nav-item-btn" @click="activeModal = 'profile'" title="个人中心">
-              <img src="/tanee/svg/dashboard/icon-20.svg" alt="User Profile" class="nav-svg-icon"/>
+            <button class="brand-tile" @click="activeModal = 'profile'" title="个人中心">
+              <svg class="plant-icon" viewBox="0 0 24 24" fill="none" stroke="#7fa08d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21V11"/>
+                <path d="M12 11C12 7.5 9.5 5 6 5C6 8.5 8.5 11 12 11Z" fill="#5f8a72" stroke="none"/>
+                <path d="M12 13C12 10 14.2 8 17.5 8C17.5 11 15.3 13 12 13Z" fill="#4c7a5f" stroke="none"/>
+              </svg>
+              <span class="brand-tile-text">让农业更智能<br />让丰收更简单</span>
             </button>
           </div>
         </aside>
@@ -1173,6 +1220,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { DataLine, Aim, Clock, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
 import gsap from 'gsap'
@@ -2177,7 +2225,7 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-/* ════════════════════ 1. SIDEBAR (103px) ════════════════════ */
+/* ════════════════════ 1. SIDEBAR (103px · 深墨绿) ════════════════════ */
 .tanee-sidebar {
   width: 103px;
   height: 834px;
@@ -2187,6 +2235,7 @@ onUnmounted(() => {
   justify-content: space-between;
   box-sizing: border-box;
   flex-shrink: 0;
+  background: linear-gradient(180deg, #16302a 0%, #10231d 55%, #0d1d18 100%);
 }
 
 .brand-frame {
@@ -2218,24 +2267,84 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  width: 100%;
 
   &.upper {
-    margin-top: 48px;
+    margin-top: 14px;
   }
 
   &.lower {
-    margin-bottom: 24px;
+    margin-top: auto;
+    margin-bottom: 16px;
+    gap: 10px;
   }
 }
 
+/* 主导航项：图标 + 文字，选中态为亮绿渐变圆角块 */
 .nav-item-btn {
-  width: 60px;
-  height: 60px;
+  width: 68px;
+  height: 58px;
   border-radius: 12px;
   border: none;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  color: #93a79c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+
+  .nav-svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .nav-label {
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  /* 白色原始填充的 SVG（icon-16 房子 fill="white"）：非选中时转为浅灰绿，
+     选中态反白 */
+  .white-filter {
+    filter: brightness(0) invert(0.72);
+    transition: filter 0.15s ease;
+  }
+
+  &.active {
+    background: linear-gradient(155deg, #2fae6f 0%, #1d8a52 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px rgba(53, 197, 110, 0.38);
+
+    .white-filter {
+      filter: brightness(0) invert(1);
+    }
+  }
+
+  &:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #d8e6de;
+
+    .white-filter {
+      filter: brightness(0) invert(0.9);
+    }
+  }
+}
+
+/* 底部功能区：主题切换小方块 */
+.nav-tile-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aebfb5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2247,24 +2356,46 @@ onUnmounted(() => {
     height: 20px;
   }
 
-  /* 白色原始填充的 SVG（icon-16 房子 fill="white"）：非选中时转为 #333333，
-     与内联描边图标同色，避免白底白图标"隐形"；选中态由 .active 反白 */
-  .white-filter {
-    filter: brightness(0) invert(0.2);
-    transition: filter 0.15s ease;
+  &.active,
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
+  }
+}
+
+/* 底部品牌块：植物 + slogan（点击进入个人中心） */
+.brand-tile {
+  width: 84px;
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 14px 6px 12px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  .plant-icon {
+    width: 26px;
+    height: 26px;
   }
 
-  &.active {
-    background: #1e2024;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  .brand-tile-text {
+    font-size: 10px;
+    line-height: 1.7;
+    color: #7d938a;
+    text-align: center;
+    white-space: nowrap;
+  }
 
-    .white-filter {
-      filter: brightness(0) invert(1);
+  &:hover {
+    background: rgba(255, 255, 255, 0.08);
+
+    .brand-tile-text {
+      color: #a7bcb1;
     }
-  }
-
-  &:hover:not(.active) {
-    background: #f8f8f8;
   }
 }
 
