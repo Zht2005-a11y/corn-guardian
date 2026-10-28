@@ -37,12 +37,17 @@ PROJECT_ROOT = SYSTEM_ROOT.parent.parent  # sjzprogram
 DATASET_TEST_DIR = PROJECT_ROOT / "dataset" / "MCDD" / "data" / "test"
 
 # 颜色映射
+# 病害主题色（前端病名徽标、分布环图用）；新类别未列出的走 DEFAULT_COLOR
 COLOR_MAP = {
     "Blight": "#e28557",
     "Common_Rust": "#d97706",
     "Gray_Leaf_Spot": "#6366f1",
     "Healthy": "#16a34a",
+    "Southern_Rust": "#dc2626",
+    "Curvularia_Leaf_Spot": "#a855f7",
+    "Mosaic_Virus": "#0ea5e9",
 }
+DEFAULT_COLOR = "#059669"
 
 # 场景映射
 SCENARIO_MAP = {
@@ -50,6 +55,9 @@ SCENARIO_MAP = {
     "Common_Rust": "高湿凝露",
     "Gray_Leaf_Spot": "叶脉受阻",
     "Healthy": "长势优良",
+    "Southern_Rust": "高温高湿",
+    "Curvularia_Leaf_Spot": "高温多雨",
+    "Mosaic_Virus": "蚜虫传毒",
 }
 
 
@@ -223,14 +231,16 @@ def get_drone_params(class_name_en: str, severity: str) -> Dict[str, str]:
 async def get_preset_samples():
     """从本地真实 MCDD 测试集中提取典型大斑病、锈病、灰斑病、健康叶片样本，供前端直选展示。"""
     samples = []
+    # 只列类别键，显示名一律取自知识库（name_cn），避免出现
+    # 「样本按钮写南方锈病、诊断卡写普通锈病」这种两处不一致
     classes = [
-        ("Blight", "blight", "玉米大斑病"),
-        ("Common_Rust", "rust", "玉米南方锈病"),
-        ("Gray_Leaf_Spot", "gray", "玉米灰斑病"),
-        ("Healthy", "healthy", "健康植株"),
+        ("Blight", "blight"),
+        ("Common_Rust", "rust"),
+        ("Gray_Leaf_Spot", "gray"),
+        ("Healthy", "healthy"),
     ]
 
-    for class_folder, s_id, display_name in classes:
+    for class_folder, s_id in classes:
         dir_path = DATASET_TEST_DIR / class_folder
         img_base64 = ""
         filename = ""
@@ -248,12 +258,12 @@ async def get_preset_samples():
         samples.append(
             {
                 "id": s_id,
-                "name": display_name,
+                "name": kb.get("name_cn", class_folder),
                 "scenario": SCENARIO_MAP.get(class_folder, "大田实拍"),
                 "diseaseName": f"{kb['name_cn']} ({kb['name_en']})",
                 "class_name_en": class_folder,
                 "pathogen": kb.get("pathogen", ""),
-                "color": COLOR_MAP.get(class_folder, "#059669"),
+                "color": COLOR_MAP.get(class_folder, DEFAULT_COLOR),
                 "imgData": img_base64,
                 "filename": filename,
             }
