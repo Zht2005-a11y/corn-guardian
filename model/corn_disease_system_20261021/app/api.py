@@ -384,6 +384,10 @@ async def predict_gradcam(
     _validate_upload(file)
     data = await _read_file(file)
     result = p.predict_with_gradcam(data, file.filename or "upload.jpg", model_key=model)
+    # cam_raw 是 numpy 激活矩阵，不能直接 JSON 序列化（会导致 500）；只返回 base64 热力图
+    gradcam = result.get("gradcam")
+    if isinstance(gradcam, dict):
+        gradcam.pop("cam_raw", None)
     return ok(result)
 
 
