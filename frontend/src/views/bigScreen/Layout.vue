@@ -1330,7 +1330,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Aim, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
@@ -2247,6 +2247,47 @@ function startNewSession() {
 // （此前声明在 sendMessage 内部，导致点「停止」时抛 ReferenceError）
 let chatAbort = null
 
+// ── Typewriter 匀速缓冲（ChatGPT 手感的核心）────────────────────────────
+// LLM 吐 token 忽快忽慢（网络抖动 / 网关合批），直接来一个上屏一个会"哗蹦一段又停半秒"。
+// 这里把接收与显示拆开：delta 先进缓冲区，rAF 以固定帧率匀速取字上屏，
+// 用户看到的始终是稳定节奏的打字效果。生产者-消费者模式。
+function createTyper(onUpdate) {
+  let pending = ''   // 已收到、待上屏
+  let displayed = '' // 已上屏
+  let rafId = null
+
+  function tick() {
+    if (pending.length) {
+      // 自适应取字量：底速 2 字/帧，积压越多吐得越快（封顶 10），保证既匀速又追得上高速流
+      const take = Math.min(Math.max(2, Math.ceil(pending.length / 40)), 10, pending.length)
+      displayed += pending.slice(0, take)
+      pending = pending.slice(take)
+      onUpdate(displayed)
+    }
+    rafId = pending.length ? requestAnimationFrame(tick) : null
+  }
+
+  return {
+    push(chunk) {
+      pending += chunk
+      if (rafId === null) rafId = requestAnimationFrame(tick)
+    },
+    // 流结束/中断时调用：把余量一次性上屏，避免「网络已结束、UI 还在逐字蹦」
+    flush() {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      if (pending.length) {
+        displayed += pending
+        pending = ''
+        onUpdate(displayed)
+      }
+    },
+    dispose() {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      pending = ''
+    }
+  }
+}
+
 async function sendMessage() {
   const query = inputText.value.trim()
   if (!query || aiTyping.value) return
@@ -2269,7 +2310,17 @@ async function sendMessage() {
   }
 
   let hasAiMsg = false
+  let aiMsg = null // 本轮 AI 气泡的引用（首个 delta 时创建）
   chatAbort = null
+
+  // 打字机缓冲：delta 不直接上屏，经 rAF 匀速释放（onUpdate 只在真正吐字时触发）
+  const typer = createTyper((text) => {
+    if (aiMsg) aiMsg.text = text
+    const body = chatBodyRef.value
+    if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
+      body.scrollTop = body.scrollHeight
+    }
+  })
 
   try {
     // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
@@ -2340,30 +2391,31 @@ async function sendMessage() {
           } else if (evt.type === 'delta') {
             if (!hasAiMsg) {
               hasAiMsg = true
-              messages.value.push({
+              aiMsg = reactive({
                 role: 'ai',
                 text: '',
                 searchQuery: toolStatus.value ? toolStatus.value.replace(/.*「(.*)」.*/, '$1') : ''
               })
+              messages.value.push(aiMsg)
             }
             toolStatus.value = ''
-            const lastMsg = messages.value[messages.value.length - 1]
-            lastMsg.text += evt.content
-            const body = chatBodyRef.value
-            if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
-              body.scrollTop = body.scrollHeight
-            }
+            // 进缓冲区由 rAF 匀速上屏，不再逐 chunk 直写
+            typer.push(evt.content)
           }
         } catch (e) {
           console.warn('解析流式消息异常:', e)
         }
       }
     }
+
+    // 流正常结束：把缓冲区余量一次性上屏
+    typer.flush()
   } catch (err) {
     if (err?.name === 'AbortError') {
-      // 用户主动停止：在已有回答后追加标记，避免误以为是异常
-      if (hasAiMsg) {
-        messages.value[messages.value.length - 1].text += '\n\n⏹ 已停止生成'
+      // 用户主动停止：先冲掉缓冲区已生成的内容，再追加标记，避免误以为是异常
+      typer.flush()
+      if (hasAiMsg && aiMsg) {
+        aiMsg.text += '\n\n⏹ 已停止生成'
       } else {
         messages.value.push({ role: 'ai', text: '⏹ 已停止生成。' })
       }
@@ -2377,6 +2429,8 @@ async function sendMessage() {
       }
     }
   } finally {
+    // 兜底：任何路径退出都停掉 rAF 循环，防止计时器泄漏
+    typer.dispose()
     aiTyping.value = false
     chatAbort = null
   }
