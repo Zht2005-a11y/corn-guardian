@@ -155,6 +155,11 @@ CLASS_INDEX_TO_CN: Dict[int, str] = {
     1: "玉米普通锈病",
     2: "玉米灰斑病",
     3: "健康叶片",
+    # 以下三项仅在扩类配置（configs/config.7cls.yaml）下启用，前 4 个索引保持不变，
+    # 这样旧的 4 类权重与知识库仍然对得上
+    4: "玉米南方锈病",
+    5: "玉米弯孢菌叶斑病",
+    6: "玉米花叶病毒病",
 }
 
 CLASS_KEY_TO_CN: Dict[str, str] = {
@@ -162,6 +167,9 @@ CLASS_KEY_TO_CN: Dict[str, str] = {
     "Common_Rust": "玉米普通锈病",
     "Gray_Leaf_Spot": "玉米灰斑病",
     "Healthy": "健康叶片",
+    "Southern_Rust": "玉米南方锈病",
+    "Curvularia_Leaf_Spot": "玉米弯孢菌叶斑病",
+    "Mosaic_Virus": "玉米花叶病毒病",
 }
 
 # 不同数据集中"同一病害"的别名，用于合并多数据集时统一类别
@@ -173,6 +181,17 @@ CLASS_ALIASES: Dict[str, str] = {
     "common_rust": "Common_Rust",
     "rust": "Common_Rust",
     "commonrust": "Common_Rust",
+    # 南方锈病（Puccinia polysora）与普通锈病（P. sorghi）是两种病，必须单独给别名，
+    # 否则会被下面的"包含式匹配"里的 "rust" 吞掉，静默并入 Common_Rust
+    "southern_rust": "Southern_Rust",
+    "southern_corn_rust": "Southern_Rust",
+    "puccinia_polysora": "Southern_Rust",
+    "curvularia_leaf_spot": "Curvularia_Leaf_Spot",
+    "curvularia": "Curvularia_Leaf_Spot",
+    "corn_curvularia_leaf_spot_fungus": "Curvularia_Leaf_Spot",
+    "mosaic_virus": "Mosaic_Virus",
+    "maize_dwarf_mosaic_virus": "Mosaic_Virus",
+    "mmdv": "Mosaic_Virus",
     "gray_leaf_spot": "Gray_Leaf_Spot",
     "gray_spot": "Gray_Leaf_Spot",
     "grey_leaf_spot": "Gray_Leaf_Spot",
@@ -182,6 +201,9 @@ CLASS_ALIASES: Dict[str, str] = {
     "normal": "Healthy",
     "health_corn": "Healthy",
 }
+
+# 标准类别键（小写形式），用于精确匹配优先，避免被包含式匹配误吞
+_CANONICAL_KEYS = {k.lower(): k for k in CLASS_KEY_TO_CN}
 
 # 常见数据集对类别名的"包裹形式"，例如 PlantVillage 的
 #   "Corn_(maize)___Northern_Leaf_Blight"
@@ -215,6 +237,10 @@ def normalize_class_name(name: str) -> str:
     key = key.strip("_")
     if key in CLASS_ALIASES:
         return CLASS_ALIASES[key]
+    # 已经是标准类别键就直接返回，绝不进包含式匹配
+    # （否则 "southern_rust" 会命中别名 "rust"，被错归成普通锈病）
+    if key in _CANONICAL_KEYS:
+        return _CANONICAL_KEYS[key]
     # 包含式匹配：较长/较具体的别名优先，避免 "rust" 误吃 "rust_xxx"
     for alias in sorted(CLASS_ALIASES, key=len, reverse=True):
         if len(alias) >= 4 and alias in key:

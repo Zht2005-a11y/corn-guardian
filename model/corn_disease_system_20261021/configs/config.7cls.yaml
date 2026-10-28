@@ -1,0 +1,92 @@
+# =========================================================
+# 玉米病虫害识别系统 —— 7 类（扩类）配置
+# 由 configs/config.example.yaml 复制而来，路径已适配本机仓库布局
+# =========================================================
+
+# ---------- 数据集 ----------
+data:
+  # 每个数据集必须符合 ImageFolder 结构: <root>/<split>/<类别名>/*.jpg
+  # 由 scripts/prepare_multiclass.py 生成的合并数据集（全局 md5 去重 + 重划分）
+  sources:
+    - name: MERGED
+      root: "D:/shijianzhou/corn-guardian/dataset/MERGED/data"
+      train_dir: train
+      test_dir: test
+      use_for_train: true
+
+  # 类别名（ImageFolder 的文件夹名，顺序即 label 索引顺序，请勿随意改动）
+  class_names: ["Blight", "Common_Rust", "Gray_Leaf_Spot", "Healthy", "Southern_Rust", "Curvularia_Leaf_Spot", "Mosaic_Virus"]
+
+  val_ratio: 0.15
+  split_seed: 42
+  num_workers: 4
+
+# ---------- 模型 ----------
+model:
+  name: "resnet50"
+  num_classes: 7
+  pretrained: true
+  dropout: 0.3
+  use_cbam: false
+  label_smoothing: 0.1
+  class_weighted_loss: true  # 新类别样本少，开启类别加权
+
+# ---------- 训练 ----------
+train:
+  image_size: 224
+  batch_size: 32
+  epochs_stage1: 5
+  epochs_stage2: 20
+  lr_stage1: 1.0e-3
+  lr_stage2: 1.0e-4
+  weight_decay: 1.0e-4
+  warmup_epochs: 1
+  cosine_eta_min: 1.0e-6
+  freeze_until: "layer2"
+  amp: true
+  seed: 42
+  save_dir: "outputs/checkpoints_7cls"
+  best_name: "best_corn_model_7cls.pth"
+
+# ---------- 评估 / 推理 ----------
+infer:
+  device: "auto"
+  max_image_side: 4096
+  confidence_high: 0.85
+  confidence_mid: 0.60
+
+# ---------- 后端服务 ----------
+server:
+  host: "127.0.0.1"
+  port: 8010
+  cors_origins: ["*"]
+  max_upload_mb: 10
+  cache_size: 256
+  models:
+    resnet50:
+      path: "outputs/checkpoints/best_corn_model.pth"
+      arch: "resnet50"
+    mobilenet_v3_large:
+      path: "outputs/checkpoints/best_corn_mobilenetv3.pth"
+      arch: "mobilenet_v3_large"
+    resnet50_cbam:
+      path: "outputs/checkpoints/best_corn_model_cbam.pth"
+      arch: "resnet50_cbam"
+  default_model: "resnet50"
+
+# ---------- 大语言模型 AI 专家问答配置 ----------
+llm:
+  enabled: true
+  provider: "agnes"
+  base_url: "https://apihub.agnes-ai.cn/v1"
+  api_key: ""   # 留空则从环境变量 AGNES_API_KEY 读取
+  model: "agnes-3.0-flash"
+  timeout: 35.0
+  temperature: 0.3
+  max_tokens: 2048
+
+# 联网搜索（DDGS 元搜索，开源零 Key）
+search:
+  proxy: ""   # 直连；如需代理可用环境变量 SEARCH_PROXY 覆盖
+  backends: ["bing", "google", "yahoo"]
+  max_results: 5

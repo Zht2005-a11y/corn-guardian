@@ -1,0 +1,61 @@
+{
+  "_说明": "多源合并计划。class_order 的顺序就是 label 索引顺序，必须与 configs/config.7cls.yaml 的 data.class_names 完全一致；前 4 个沿用旧索引，便于复用已有权重。",
+  "_split说明": "val 比例设为 0：本项目 src/dataset.py 只吃 train/test 两个目录，验证集由 train.py 按 config.val_ratio 从 train 里再切一次（去重已在前面做完，不会再产生泄漏）。",
+  "output": "D:/shijianzhou/corn-guardian/dataset/MERGED/data",
+  "seed": 2026,
+  "ratios": { "train": 0.85, "val": 0.0, "test": 0.15 },
+  "conflict_policy": "skip",
+  "class_order": [
+    "Blight",
+    "Common_Rust",
+    "Gray_Leaf_Spot",
+    "Healthy",
+    "Southern_Rust",
+    "Curvularia_Leaf_Spot",
+    "Mosaic_Virus"
+  ],
+  "sources": [
+    {
+      "name": "MCDD",
+      "root": "D:/shijianzhou/corn-guardian/dataset/MCDD/data",
+      "splits": { "train": "train", "test": "test" },
+      "map": {
+        "Blight": "Blight",
+        "Common_Rust": "Common_Rust",
+        "Gray_Leaf_Spot": "Gray_Leaf_Spot",
+        "Healthy": "Healthy"
+      }
+    },
+    {
+      "_说明": "AI Challenger 2018 玉米部分（官方 label 9~16）。下载后按 disease_class 把图片分到 9/10/11... 目录，放成 <root>/train/<label>/；若拿到的镜像已按类别名建好文件夹，用下面的 map 即可。",
+      "name": "AIC2018",
+      "root": "D:/shijianzhou/corn-guardian/dataset/AIC2018/data",
+      "splits": { "train": "train" },
+      "map_by_folder": {
+        "9_healthy": "Healthy",
+        "10_gray_leaf_spot_general": "Gray_Leaf_Spot",
+        "11_gray_leaf_spot_serious": "Gray_Leaf_Spot",
+        "12_southern_rust_general": "Southern_Rust",
+        "13_southern_rust_serious": "Southern_Rust",
+        "14_curvularia_general": "Curvularia_Leaf_Spot",
+        "15_curvularia_serious": "Curvularia_Leaf_Spot",
+        "16_mosaic_virus": "Mosaic_Virus",
+        "9": "Healthy",
+        "10": "Gray_Leaf_Spot",
+        "11": "Gray_Leaf_Spot",
+        "12": "Southern_Rust",
+        "13": "Southern_Rust",
+        "14": "Curvularia_Leaf_Spot",
+        "15": "Curvularia_Leaf_Spot",
+        "16": "Mosaic_Virus"
+      },
+      "map": {
+        "Corn_healthy": "Healthy",
+        "Corn_Gray_Leaf_Spot": "Gray_Leaf_Spot",
+        "Corn_Southern_Rust": "Southern_Rust",
+        "Corn_Curvularia_Leaf_Spot": "Curvularia_Leaf_Spot",
+        "Corn_Mosaic_Virus": "Mosaic_Virus"
+      }
+    }
+  ]
+}
