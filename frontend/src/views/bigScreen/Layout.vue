@@ -903,10 +903,16 @@
                   <Streamdown
                     v-else
                     class="msg-stream"
+                    :class="{ 'is-streaming': aiTyping && i === messages.length - 1 }"
                     :children="msg.text"
                     :mode="aiTyping && i === messages.length - 1 ? 'streaming' : 'static'"
                     :is-animating="aiTyping && i === messages.length - 1"
-                    animated
+                    :animated="{
+                      animation: 'blurIn',
+                      duration: 450,
+                      easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)',
+                      sep: 'word'
+                    }"
                     caret="circle"
                   />
                 </div>
@@ -4702,6 +4708,13 @@ onUnmounted(() => {
           .sd-caret {
             background-color: #35c56e !important;
           }
+        }
+
+        /* 技术三：渐变遮罩——正在流式的块底缘做柔和淡出，
+           新内容像从雾里"长"出来，而不是硬切换出现 */
+        :deep(.msg-stream.is-streaming > *:last-child) {
+          -webkit-mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 86%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 86%, transparent 100%);
         }
       }
 
