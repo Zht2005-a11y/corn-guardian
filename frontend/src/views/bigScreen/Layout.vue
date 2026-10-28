@@ -79,9 +79,16 @@
               <div v-if="themeMenuOpen" class="theme-popover-mask" @click="themeMenuOpen = false"></div>
             </div>
 
-            <button class="nav-item-btn" @click="activeModal = 'profile'" title="个人中心">
-              <img src="/tanee/svg/dashboard/icon-20.svg" alt="User Profile" class="nav-svg-icon"/>
-            </button>
+            <!-- 品牌标签（原「个人中心」入口已移除）：纯展示，不可点击、无 tooltip -->
+            <div class="brand-sticker" aria-hidden="true">
+              <svg class="sticker-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21V12"/>
+                <path d="M12 13.5C12 10.2 9.4 7.5 6 7.5c0 3.3 2.6 6 6 6Z"/>
+                <path d="M12 15.5c0-3.3 2.6-6 6-6 0 3.3-2.6 6-6 6Z"/>
+              </svg>
+              <span class="sticker-line">让农业更智能</span>
+              <span class="sticker-line">让丰收更简单</span>
+            </div>
           </div>
         </aside>
 
@@ -1252,46 +1259,6 @@
       </div>
     </div>
     </Transition>
-
-    <!-- Personal Center Modal（个人中心） -->
-    <div class="modal-backdrop-blur" v-if="activeModal === 'profile'" @click.self="activeModal = null">
-      <div class="tanee-modal-card profile-modal-card">
-        <div class="t-modal-head">
-          <div class="head-title-flex">
-            <img src="/tanee/svg/dashboard/icon-20.svg" alt="Profile" class="modal-head-icon"/>
-            <h4>个人中心</h4>
-          </div>
-          <button class="modal-close-btn" @click="activeModal = null">✕</button>
-        </div>
-        <div class="t-modal-body profile-body">
-          <div class="profile-id-card">
-            <div class="profile-avatar-circle">农</div>
-            <div class="profile-id-info">
-              <h3>植保管理员</h3>
-              <div class="profile-role-tags">
-                <span class="role-tag green">系统管理员</span>
-                <span class="role-tag gray">飞防调度员</span>
-              </div>
-              <p>玉米叶部病斑多尺度自适应感知与飞防决策系统</p>
-            </div>
-          </div>
-          <div class="profile-stats-grid">
-            <div class="profile-stat-cell"><strong>{{ historyStats ? historyStats.today : '—' }}</strong><span>今日诊断（次）</span></div>
-            <div class="profile-stat-cell"><strong>47</strong><span>累计任务（个）</span></div>
-            <div class="profile-stat-cell"><strong>8.6</strong><span>巡田里程（km）</span></div>
-          </div>
-          <div class="profile-info-rows">
-            <div class="profile-info-row"><span>登录账号</span><strong>admin@tanee.cn</strong></div>
-            <div class="profile-info-row"><span>所属单位</span><strong>智慧农业示范田 08 分区</strong></div>
-            <div class="profile-info-row"><span>上次登录</span><strong>今天 08:02 · 示范田边缘网关</strong></div>
-          </div>
-          <div class="profile-action-bar">
-            <button class="profile-secondary-btn">编辑资料</button>
-            <button class="profile-primary-btn">退出登录</button>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -2485,7 +2452,7 @@ onMounted(() => {
   window.addEventListener('resize', handleResize)
   loadSamples()
   restartCarousel()
-  refreshHistoryStats() // 个人中心「今日诊断」用真实计数
+  refreshHistoryStats() // 历史弹窗顶部「今日 N 次 · 共 M 条」
   refreshAlertStats() // 顶部告警胶囊的未读数
   alertPollTimer = setInterval(refreshAlertStats, 60000)
   // 灵动岛入场：从顶部缓缓落下
@@ -2597,6 +2564,40 @@ onUnmounted(() => {
 
   &.lower {
     margin-bottom: 24px;
+  }
+}
+
+/* 品牌标签：占原来「个人中心」按钮的位置，纯展示
+   pointer-events: none 保证既点不进去、也不会弹出任何悬浮提示 */
+.brand-sticker {
+  width: 88px;
+  padding: 13px 8px 14px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #123620 0%, #0c2a1a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+
+  .sticker-leaf {
+    width: 22px;
+    height: 22px;
+    color: #6fbf8c;
+    margin-bottom: 5px;
+    opacity: 0.92;
+  }
+
+  .sticker-line {
+    font-size: 10px;
+    line-height: 1.55;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.74);
+    white-space: nowrap;
   }
 }
 
@@ -4772,125 +4773,6 @@ onUnmounted(() => {
 
   &.theme-green {
     filter: sepia(0.22) hue-rotate(28deg) saturate(1.35) brightness(0.99);
-  }
-}
-
-/* ════════════════════ 个人中心 Modal ════════════════════ */
-.profile-modal-card { width: 440px; }
-
-.profile-body {
-  .profile-id-card {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-
-    .profile-avatar-circle {
-      width: 56px;
-      height: 56px;
-      border-radius: 9999px;
-      background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
-      color: #ffffff;
-      font-size: 22px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(53, 197, 110, 0.3);
-      flex-shrink: 0;
-    }
-
-    .profile-id-info {
-      min-width: 0;
-
-      h3 { margin: 0 0 6px; font-size: 17px; color: #1e2024; }
-
-      .profile-role-tags {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 6px;
-
-        .role-tag {
-          font-size: 10.5px;
-          padding: 2px 8px;
-          border-radius: 9999px;
-          font-weight: 600;
-
-          &.green { background: #f0fdf4; color: #178a56; border: 1px solid #b7e4c9; }
-          &.gray { background: #f5f5f5; color: #666666; border: 1px solid #e5e5e5; }
-        }
-      }
-
-      p { margin: 0; font-size: 11px; color: #a4a4a4; line-height: 1.4; }
-    }
-  }
-
-  .profile-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-
-    .profile-stat-cell {
-      background: #f8f8f8;
-      border-radius: 10px;
-      padding: 12px 8px;
-      text-align: center;
-
-      strong { display: block; font-size: 20px; color: #178a56; }
-      span { font-size: 10.5px; color: #a4a4a4; }
-    }
-  }
-
-  .profile-info-rows {
-    background: #ffffff;
-    border: 1px solid #f0f0f0;
-    border-radius: 10px;
-    overflow: hidden;
-
-    .profile-info-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      font-size: 12.5px;
-
-      & + .profile-info-row { border-top: 1px solid #f5f5f5; }
-
-      span { color: #a4a4a4; }
-      strong { color: #333333; font-weight: 600; }
-    }
-  }
-
-  .profile-action-bar {
-    display: flex;
-    gap: 10px;
-
-    .profile-secondary-btn {
-      flex: 1;
-      border: 1px solid #dcdcdc;
-      background: #ffffff;
-      border-radius: 9px;
-      padding: 9px 0;
-      font-size: 13px;
-      color: #333333;
-      font-weight: 600;
-      cursor: pointer;
-
-      &:hover { border-color: #178a56; color: #178a56; }
-    }
-
-    .profile-primary-btn {
-      flex: 1;
-      border: none;
-      background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
-      border-radius: 9px;
-      padding: 9px 0;
-      font-size: 13px;
-      color: #ffffff;
-      font-weight: 700;
-      cursor: pointer;
-
-      &:hover { filter: brightness(1.05); }
-    }
   }
 }
 
