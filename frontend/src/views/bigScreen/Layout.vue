@@ -312,11 +312,11 @@
                 <!-- Header: Disease Title + Severity Tag -->
                 <div class="dd-header-row">
                   <div class="dd-disease-info">
-                    <h4 class="dd-disease-title">{{ isDetected ? (currentSample?.diseaseName || '玉米大斑病 (Northern Corn Leaf Blight)') : (isDetecting ? 'AI 正在推理中...' : '待检测样本（等待诊断）') }}</h4>
-                    <span class="dd-pathogen-txt">{{ isDetected ? (currentSample?.pathogen || '病原菌：真菌，大斑凸脐蠕孢 (Exserohilum turcicum)') : (isDetecting ? '深度卷积注意力网络正在提取叶片表征特征...' : '尚未执行 AI 推理，请点击上方【开始诊断】按钮') }}</span>
+                    <h4 class="dd-disease-title">{{ rejectNotice ? '非目标图像（已拒识）' : (isDetected ? (currentSample?.diseaseName || '玉米大斑病 (Northern Corn Leaf Blight)') : (isDetecting ? 'AI 正在推理中...' : '待检测样本（等待诊断）')) }}</h4>
+                    <span class="dd-pathogen-txt">{{ rejectNotice ? '未检测到玉米叶片，本张图片不参与病害统计与处方生成' : (isDetected ? (currentSample?.pathogen || '病原菌：真菌，大斑凸脐蠕孢 (Exserohilum turcicum)') : (isDetecting ? '深度卷积注意力网络正在提取叶片表征特征...' : '尚未执行 AI 推理，请点击上方【开始诊断】按钮')) }}</span>
                   </div>
-                  <div class="dd-severity-badge" :style="{ backgroundColor: isDetected ? (currentSample?.color || '#e28557') : (isDetecting ? '#3b82f6' : '#667085') }">
-                    {{ isDetected ? (currentSample?.severity || '中度 (II 级扩展期)') : (isDetecting ? '推理中...' : '待诊断') }}
+                  <div class="dd-severity-badge" :style="{ backgroundColor: rejectNotice ? '#b42318' : (isDetected ? (currentSample?.color || '#e28557') : (isDetecting ? '#3b82f6' : '#667085')) }">
+                    {{ rejectNotice ? '拒识' : (isDetected ? (currentSample?.severity || '中度 (II 级扩展期)') : (isDetecting ? '推理中...' : '待诊断')) }}
                   </div>
                 </div>
 
@@ -365,13 +365,19 @@
                       <span class="flight-tag-icon">🚁 飞防作业决策与施药处方</span>
                     </div>
 
+                    <div v-if="rejectNotice" class="rx-reject-notice">
+                      ⚠️ {{ rejectNotice }}
+                    </div>
+
                     <p class="flight-prescription-txt" :class="{ 'waiting-txt': !isDetected }">
                       {{
-                        isDetected
-                          ? (currentSample?.prescription || '选用 40% 氟硅唑·多菌灵可湿性粉剂 1000倍液 或 苯醚甲环唑·嘧菌酯，利用大田植保无人机实施傍晚超低空微滴变量精准喷雾。')
-                          : (isDetecting
-                              ? '正在结合病斑注意力多尺度特征评估施药剂量与无人机航行参数...'
-                              : '图片已成功载入。请点击上方【开始诊断】按钮，系统将调用 ResNet50-CBAM 模型进行病斑多尺度定位与无人机处方生成。')
+                        rejectNotice
+                          ? '本次未生成处方：图像中未检测到玉米叶片。请对准叶片、避免逆光与强反光后重新拍摄。'
+                          : (isDetected
+                              ? (currentSample?.prescription || '')
+                              : (isDetecting
+                                  ? '正在结合病斑注意力多尺度特征评估施药剂量与无人机航行参数...'
+                                  : '图片已成功载入。请点击上方【开始诊断】按钮，系统将调用 ResNet50-CBAM 模型进行病斑多尺度定位与无人机处方生成。'))
                       }}
                     </p>
 
@@ -401,8 +407,8 @@
 
                     <!-- Weather Flight Suitability Notice -->
                     <div class="flight-weather-notice" :class="{ 'notice-waiting': !isDetected }">
-                      <span class="check-icon">{{ isDetected ? '✓' : 'ℹ' }}</span>
-                      <span>{{ isDetected ? '当前风速 2m/s、温度 19°C 满足低空飞防窗口，无漂移药害风险' : '待诊断完成后，系统将根据病斑受损率与气象窗口生成施药决策' }}</span>
+                      <span class="check-icon">{{ rejectNotice ? '!' : (isDetected ? '✓' : 'ℹ') }}</span>
+                      <span>{{ rejectNotice ? '未通过叶片校验，本次不进入用药与飞防参数计算' : (isDetected ? '当前风速 2m/s、温度 19°C 满足低空飞防窗口，无漂移药害风险' : '待诊断完成后，系统将根据病斑受损率与气象窗口生成施药决策') }}</span>
                     </div>
                   </div>
                 </div>
@@ -1132,6 +1138,14 @@
             </div>
           </div>
 
+          <div v-if="batchRejected.length" class="batch-rejected">
+            <div class="batch-rejected-head">以下 {{ batchRejected.length }} 张未检测到玉米叶片，已拒识（不计入统计）</div>
+            <div v-for="r in batchRejected" :key="r.index" class="batch-reject-row">
+              <span class="br-name" :title="r.filename">{{ r.filename }}</span>
+              <span class="br-reason" :title="r.reason">已拒识</span>
+            </div>
+          </div>
+
           <div v-if="batchErrors.length" class="batch-errors">
             <div v-for="e in batchErrors" :key="e.index" class="batch-error-row">
               第 {{ e.index + 1 }} 张（{{ e.filename }}）失败：{{ e.error }}
@@ -1338,6 +1352,8 @@ const isDetected = ref(true)
 const showHeatmap = ref(false)
 const showBBoxes = ref(true)
 const inferenceSpeed = ref('14.2ms')
+// 非目标图像（未检测到玉米叶片）的提示文案；正常识别时为空
+const rejectNotice = ref('')
 
 // 植株健康度（Magic UI NumberTicker 消费的数值源）
 const plantHealthValue = computed(() =>
@@ -1398,6 +1414,7 @@ function processUploadedFile(file) {
       droneParams: null
     }
     isDetected.value = false
+    rejectNotice.value = ''
     showHeatmap.value = false
     // 导入图片后保持待诊断状态，不自动执行推理，等待用户点击“开始诊断”按钮
   }
@@ -1676,6 +1693,7 @@ function selectPreset(s, autoDetect = true) {
   currentSample.value = { ...s }
   previewUrl.value = s.imgData
   isDetected.value = false
+  rejectNotice.value = ''
   showHeatmap.value = false
   if (autoDetect) {
     runDetect()
@@ -1718,6 +1736,7 @@ function triggerCameraCapture() {
     droneParams: null
   }
   isDetected.value = false
+  rejectNotice.value = ''
   showHeatmap.value = false
   // 抓拍导入后保持待诊断状态，等待用户点击“开始诊断”
 }
@@ -1736,6 +1755,29 @@ async function runDetect() {
 
     if (res.data?.data) {
       const data = res.data.data
+
+      // 非目标图像：直接拒识，不出严重度/处方，也不计入统计
+      if (data.is_target === false) {
+        rejectNotice.value = data.reject_reason || '未检测到玉米叶片，请对准叶片重新拍摄'
+        isDetected.value = false
+        currentSample.value = {
+          ...currentSample.value,
+          diseaseName: '非目标图像',
+          class_name_en: '',
+          class_name_cn: '非目标图像',
+          severity: '—',
+          damageRate: 0,
+          confidence: data.confidence,
+          prescription: '',
+          droneParams: {},
+          boxes: [],
+          gradcam_base64: ''
+        }
+        inferenceSpeed.value = data.inference_ms + 'ms'
+        return
+      }
+
+      rejectNotice.value = ''
       currentSample.value = {
         ...currentSample.value,
         diseaseName: data.diseaseName,
@@ -1906,6 +1948,7 @@ const batchInput = ref(null)
 const batchFiles = ref([])
 const batchItems = ref([])
 const batchErrors = ref([])
+const batchRejected = ref([])
 const batchSummary = ref(null)
 const batchRunning = ref(false)
 const batchElapsed = ref(0)
@@ -1982,6 +2025,7 @@ function resetBatch() {
   batchFiles.value = []
   batchItems.value = []
   batchErrors.value = []
+  batchRejected.value = []
   batchSummary.value = null
   batchError.value = ''
 }
@@ -1993,6 +2037,7 @@ async function runBatch() {
   batchError.value = ''
   batchItems.value = []
   batchErrors.value = []
+  batchRejected.value = []
   batchSummary.value = null
   batchTimer = setInterval(() => { batchElapsed.value += 1 }, 1000)
 
@@ -2013,6 +2058,7 @@ async function runBatch() {
         _thumb: batchFiles.value[it.index]?.dataUrl || '',
       }))
       batchErrors.value = d.errors || []
+      batchRejected.value = d.rejected || []
       batchSummary.value = d.summary || null
       refreshHistoryStats()
     }
@@ -5441,6 +5487,57 @@ onUnmounted(() => {
       &:hover { border-color: #98a2b3; }
       &.danger { color: #b42318; border-color: #fda29b; }
       &.danger:hover { background: #fef3f2; }
+    }
+  }
+}
+/* 非目标图像拒识提示（决策卡内） */
+.rx-reject-notice {
+  margin: 4px 0 2px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #fef3f2;
+  border: 1px solid #fda29b;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.45;
+  flex: 0 0 auto;
+}
+
+/* 批量里被拒识的图片 */
+.batch-rejected {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+
+  .batch-rejected-head {
+    font-size: 12px;
+    font-weight: 600;
+    color: #b54708;
+    margin-bottom: 4px;
+  }
+
+  .batch-reject-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 11.5px;
+    color: #93370d;
+    line-height: 1.7;
+
+    .br-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .br-reason {
+      flex: 0 0 auto;
+      color: #b54708;
+      white-space: nowrap;
     }
   }
 }
