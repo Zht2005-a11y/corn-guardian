@@ -254,6 +254,13 @@
                     </div>
 
                     <div class="canvas-right-group">
+                      <button class="canvas-action-btn ghost" @click="openBatch" title="一次识别多张巡田照片">
+                        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                          <rect x="1.6" y="3.2" width="8.4" height="8.4" rx="1.4"/>
+                          <rect x="6" y="6" width="8.4" height="8.4" rx="1.4"/>
+                        </svg>
+                        <span>批量识别</span>
+                      </button>
                       <button class="canvas-action-btn ghost" @click="openHistory" title="回看历史诊断记录">
                         <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
                           <circle cx="8" cy="8" r="6.2"/><path d="M8 4.8V8l2.4 1.6"/>
@@ -379,7 +386,7 @@
                       </div>
                       <div class="d-param-item">
                         <span class="dp-k">雾滴粒径</span>
-                        <span class="dp-v">{{ isDetected ? (currentSample?.droneParams?.droplet_size || currentSample?.droneParams?.dropletSize || '135 μm') : '--' }}</span>
+                        <span class="dp-v">{{ isDetected ? droneDroplet : '--' }}</span>
                       </div>
                       <div class="d-param-item">
                         <span class="dp-k">作业航高</span>
@@ -1031,6 +1038,98 @@
       </div>
     </div>
 
+    <!-- Batch Recognition Drawer（批量巡田识别） -->
+    <div class="modal-backdrop-blur" v-if="activeModal === 'batch'" @click.self="activeModal = null">
+      <div class="tanee-modal-card large batch-modal-card">
+        <div class="t-modal-head">
+          <div class="head-title-flex">
+            <img src="/tanee/svg/dashboard/icon-15.svg" alt="Batch" class="modal-head-icon"/>
+            <h4>批量巡田识别</h4>
+            <span v-if="batchSummary" class="history-stat-chip">
+              成功 {{ batchSummary.success }}/{{ batchSummary.count }} · 平均受损 {{ batchSummary.avgDamageRate }}%
+            </span>
+          </div>
+          <button class="modal-close-btn" @click="activeModal = null">✕</button>
+        </div>
+        <div class="t-modal-body batch-body">
+          <input ref="batchInput" type="file" accept="image/*" multiple class="batch-file-input" @change="onBatchFiles"/>
+
+          <div class="batch-picker" @click="batchInput && batchInput.click()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6">
+              <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5"/><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3"/>
+            </svg>
+            <strong>点击选择图片</strong>
+            <span>支持多选 · 单次最多 {{ BATCH_MAX }} 张 · 自动压缩后上传</span>
+          </div>
+
+          <div v-if="batchFiles.length" class="batch-thumbs">
+            <div v-for="(f, i) in batchFiles" :key="i" class="batch-thumb">
+              <img :src="f.dataUrl" :alt="f.name"/>
+              <span class="batch-thumb-name">{{ f.name }}</span>
+              <button class="batch-thumb-del" @click.stop="removeBatchFile(i)" title="移除">✕</button>
+            </div>
+          </div>
+
+          <div class="batch-actions">
+            <button class="batch-run-btn" :disabled="!batchFiles.length || batchRunning" @click="runBatch">
+              <span class="btn-spinner" v-if="batchRunning"></span>
+              {{ batchRunning ? `识别中… 已用 ${batchElapsed}s` : '开始批量识别' }}
+            </button>
+            <button v-if="batchFiles.length && !batchRunning" class="batch-clear-btn" @click="resetBatch">清空</button>
+            <span v-if="batchFiles.length && !batchRunning" class="batch-hint">已选 {{ batchFiles.length }} 张</span>
+          </div>
+
+          <div v-if="batchError" class="batch-error">{{ batchError }}</div>
+
+          <div v-if="batchSummary" class="batch-summary">
+            <div class="bs-cell"><strong>{{ batchSummary.success }}</strong><span>识别张数</span></div>
+            <div class="bs-cell"><strong>{{ (batchSummary.acreage * batchSummary.success).toFixed(1) }} 亩</strong><span>覆盖面积</span></div>
+            <div class="bs-cell"><strong>{{ batchSummary.totalVolumeLiters }} L</strong><span>建议药液量</span></div>
+            <div class="bs-cell"><strong>{{ batchSummary.avgDamageRate }}%</strong><span>平均受损率</span></div>
+            <div class="bs-cell"><strong>{{ batchSummary.avgConfidence }}%</strong><span>平均置信度</span></div>
+          </div>
+
+          <div v-if="batchSummary?.byClass?.length" class="batch-dist">
+            <span class="batch-dist-label">病害分布</span>
+            <span v-for="c in batchSummary.byClass" :key="c.class_en" class="batch-dist-chip"
+                  :style="{ color: c.color, background: c.color + '1a', borderColor: c.color + '40' }">
+              {{ c.name }} × {{ c.count }}
+            </span>
+          </div>
+
+          <div v-if="batchSummary?.worst" class="batch-worst">
+            最严重：<strong>{{ batchSummary.worst.diseaseName }}</strong>
+            · {{ batchSummary.worst.severity }} · 受损率 {{ batchSummary.worst.damageRate }}%
+            <span class="batch-worst-file">{{ batchSummary.worst.filename }}</span>
+          </div>
+
+          <div v-if="batchItems.length" class="batch-list">
+            <div v-for="it in batchItems" :key="it.index" class="batch-item">
+              <img v-if="it._thumb" :src="it._thumb" class="batch-item-thumb" alt=""/>
+              <div class="batch-item-main">
+                <div class="bi-row1">
+                  <strong>{{ it.class_name_cn }}</strong>
+                  <em class="hi-sev" :data-sev="sevKey(it.severity)">{{ sevKey(it.severity) }}</em>
+                  <span class="bi-file">{{ it.filename }}</span>
+                </div>
+                <div class="bi-row2">
+                  置信度 {{ it.confidence }}% · 受损率 {{ it.damageRate }}% ·
+                  {{ it.droneParams?.model || '—' }} · {{ it.droneParams?.volume || '—' }} · {{ it.inference_ms }}ms
+                </div>
+                <div class="bi-rx">{{ it.prescription }}</div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="batchErrors.length" class="batch-errors">
+            <div v-for="e in batchErrors" :key="e.index" class="batch-error-row">
+              第 {{ e.index + 1 }} 张（{{ e.filename }}）失败：{{ e.error }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- Telemetry & Radar Drawer -->
     <div class="modal-backdrop-blur" v-if="activeModal === 'telemetry'" @click.self="activeModal = null">
       <div class="tanee-modal-card large">
@@ -1235,6 +1334,13 @@ const plantHealthValue = computed(() =>
     ? Math.max(10, Math.round(100 - currentSample.value.damageRate))
     : 94,
 )
+
+// 雾滴粒径：后端会带「120 μm (超细雾化)」这类备注，参数行只放数值以免换行撑高
+const droneDroplet = computed(() => {
+  const dp = currentSample.value?.droneParams || {}
+  const raw = dp.dropletSize || dp.droplet_size || '135 μm'
+  return String(raw).replace(/\s*[（(][^)）]*[)）]\s*$/, '')
+})
 
 function triggerUpload() {
   if (fileInputRef.value) {
@@ -1630,6 +1736,8 @@ async function runDetect() {
         confidence: data.confidence,
         color: data.color || '#17B26A',
         prescription: data.prescription,
+        // 飞防参数也要跟着本次结果的严重度走，否则模板默认值（1.6 L/亩…）会和动态处方打架
+        droneParams: data.droneParams,
         boxes: data.boxes || [],
         gradcam_base64: data.gradcam_base64
       }
@@ -1704,6 +1812,134 @@ async function removeHistory(id) {
     await loadHistory()
   } catch (err) {
     console.error('删除历史记录失败:', err)
+  }
+}
+
+// ── Batch Recognition（批量巡田识别 · /screen/predict/batch）────────────
+const BATCH_MAX = 24
+const batchInput = ref(null)
+const batchFiles = ref([])
+const batchItems = ref([])
+const batchErrors = ref([])
+const batchSummary = ref(null)
+const batchRunning = ref(false)
+const batchElapsed = ref(0)
+const batchError = ref('')
+let batchTimer = null
+
+// 严重度带描述（"危急 (IV 级暴发期)"），徽标只显示档位词
+function sevKey(severity) {
+  const s = String(severity || '')
+  for (const kw of ['危急', '重度', '中度', '轻度']) if (s.includes(kw)) return kw
+  return s.includes('健康') ? '健康' : s
+}
+
+// 浏览器端压缩：最长边 1024px / JPEG 0.86，避免 24 张原图把请求体撑到几十 MB
+function fileToDataUrl(file, maxSide = 1024, quality = 0.86) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onerror = () => reject(new Error('读取失败'))
+    reader.onload = () => {
+      const img = new Image()
+      img.onerror = () => reject(new Error('图片解码失败'))
+      img.onload = () => {
+        let { width, height } = img
+        const scale = Math.min(1, maxSide / Math.max(width, height))
+        width = Math.round(width * scale)
+        height = Math.round(height * scale)
+        const canvas = document.createElement('canvas')
+        canvas.width = width
+        canvas.height = height
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height)
+        resolve(canvas.toDataURL('image/jpeg', quality))
+      }
+      img.src = reader.result
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+function openBatch() {
+  activeModal.value = 'batch'
+}
+
+async function onBatchFiles(e) {
+  const picked = [...(e.target.files || [])]
+  batchError.value = ''
+  const room = BATCH_MAX - batchFiles.value.length
+  if (room <= 0) {
+    batchError.value = `单次最多 ${BATCH_MAX} 张，请先清空或分批提交`
+    e.target.value = ''
+    return
+  }
+  if (picked.length > room) batchError.value = `最多 ${BATCH_MAX} 张，已忽略多余的 ${picked.length - room} 张`
+
+  for (const f of picked.slice(0, room)) {
+    if (!f.type.startsWith('image/')) continue
+    try {
+      batchFiles.value.push({ name: f.name, dataUrl: await fileToDataUrl(f) })
+    } catch {
+      batchError.value = `图片处理失败：${f.name}`
+    }
+  }
+  e.target.value = ''
+  batchItems.value = []
+  batchSummary.value = null
+  batchErrors.value = []
+}
+
+function removeBatchFile(i) {
+  batchFiles.value.splice(i, 1)
+}
+
+function resetBatch() {
+  batchFiles.value = []
+  batchItems.value = []
+  batchErrors.value = []
+  batchSummary.value = null
+  batchError.value = ''
+}
+
+async function runBatch() {
+  if (!batchFiles.value.length || batchRunning.value) return
+  batchRunning.value = true
+  batchElapsed.value = 0
+  batchError.value = ''
+  batchItems.value = []
+  batchErrors.value = []
+  batchSummary.value = null
+  batchTimer = setInterval(() => { batchElapsed.value += 1 }, 1000)
+
+  try {
+    const res = await axios.post(
+      '/api/screen/predict/batch',
+      {
+        images: batchFiles.value.map((f) => ({ image_base64: f.dataUrl, filename: f.name })),
+        model: 'resnet50_cbam',
+        acreage_per_image: 1.0,
+      },
+      { timeout: 600000 }
+    )
+    const d = res.data?.data
+    if (d) {
+      batchItems.value = (d.items || []).map((it) => ({
+        ...it,
+        _thumb: batchFiles.value[it.index]?.dataUrl || '',
+      }))
+      batchErrors.value = d.errors || []
+      batchSummary.value = d.summary || null
+      refreshHistoryStats()
+    }
+  } catch (err) {
+    console.error('批量识别失败:', err)
+    batchError.value =
+      '批量识别失败：' + (err?.response?.data?.detail || err?.message || '请检查后端服务')
+  } finally {
+    batchRunning.value = false
+    if (batchTimer) {
+      clearInterval(batchTimer)
+      batchTimer = null
+    }
   }
 }
 
@@ -3006,12 +3242,14 @@ onUnmounted(() => {
     }
 
     .flight-prescription-txt {
+      flex: 0 0 auto; /* 不让 flex 压缩，否则第 4 行会被裁掉 */
       margin: 2px 0;
       font-size: 12.5px;
       color: #344054;
       line-height: 1.4;
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      /* 处方改为按严重度动态生成，最长（危急 + 低置信度）约 145 字，4 行放得下且卡片无溢出 */
+      -webkit-line-clamp: 4;
       -webkit-box-orient: vertical;
       overflow: hidden;
 
@@ -3042,9 +3280,10 @@ onUnmounted(() => {
         }
 
         .dp-v {
-          font-size: 12.5px;
+          font-size: 11.5px;
           font-weight: 700;
           color: #101828;
+          white-space: nowrap; /* 长机型名不换行，否则整行高度翻倍挤压处方 */
         }
       }
     }
@@ -4771,6 +5010,256 @@ onUnmounted(() => {
 
       .hi-en { font-style: normal; color: #98a2b3; font-weight: 400; font-size: 11.5px; }
       .hi-name strong, strong.hi-name { font-weight: 700; }
+    }
+  }
+}
+/* ── Batch Recognition（批量巡田识别）────────────────────────────── */
+.batch-modal-card {
+  .batch-body {
+    max-height: 64vh;
+    overflow-y: auto;
+    padding: 14px 16px 16px;
+  }
+
+  .batch-file-input { display: none; }
+
+  .batch-picker {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 22px 16px;
+    border: 1.5px dashed #cfd8d3;
+    border-radius: 10px;
+    background: #f8fbf9;
+    cursor: pointer;
+    transition: border-color 0.15s ease, background 0.15s ease;
+
+    &:hover { border-color: #17b26a; background: #f1faf5; }
+
+    svg { width: 26px; height: 26px; color: #17b26a; }
+    strong { font-size: 13.5px; color: #101828; }
+    span { font-size: 11.5px; color: #98a2b3; }
+  }
+
+  .batch-thumbs {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(86px, 1fr));
+    gap: 8px;
+    margin-top: 10px;
+  }
+
+  .batch-thumb {
+    position: relative;
+    border-radius: 6px;
+    overflow: hidden;
+    background: #f2f4f7;
+
+    img { width: 100%; height: 64px; object-fit: cover; display: block; }
+
+    .batch-thumb-name {
+      display: block;
+      padding: 2px 4px;
+      font-size: 10px;
+      color: #667085;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .batch-thumb-del {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 18px;
+      height: 18px;
+      line-height: 16px;
+      border: none;
+      border-radius: 50%;
+      background: rgba(16, 24, 40, 0.6);
+      color: #ffffff;
+      font-size: 10px;
+      cursor: pointer;
+      &:hover { background: #b42318; }
+    }
+  }
+
+  .batch-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .batch-run-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 18px;
+    border: none;
+    border-radius: 6px;
+    background: linear-gradient(135deg, #17b26a 0%, #0f9755 100%);
+    color: #ffffff;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { filter: brightness(1.08); }
+    &:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .btn-spinner {
+      width: 11px;
+      height: 11px;
+      border: 2px solid rgba(255, 255, 255, 0.4);
+      border-top-color: #ffffff;
+      border-radius: 9999px;
+      animation: spin 0.8s linear infinite;
+    }
+  }
+
+  .batch-clear-btn {
+    padding: 6px 14px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #344054;
+    font-size: 12.5px;
+    cursor: pointer;
+    &:hover { border-color: #98a2b3; }
+  }
+
+  .batch-hint { font-size: 11.5px; color: #98a2b3; }
+
+  .batch-error {
+    margin-top: 10px;
+    padding: 7px 10px;
+    border-radius: 6px;
+    background: #fef3f2;
+    color: #b42318;
+    font-size: 12px;
+  }
+
+  .batch-summary {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .bs-cell {
+    padding: 8px 6px;
+    border-radius: 8px;
+    background: #f9fafb;
+    border: 1px solid #eef0f2;
+    text-align: center;
+
+    strong { display: block; font-size: 15px; color: #101828; line-height: 1.2; }
+    span { font-size: 10.5px; color: #667085; }
+  }
+
+  .batch-dist {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+
+    .batch-dist-label { font-size: 11.5px; color: #667085; }
+
+    .batch-dist-chip {
+      font-size: 11.5px;
+      font-weight: 600;
+      padding: 2px 9px;
+      border-radius: 999px;
+      border: 1px solid transparent;
+    }
+  }
+
+  .batch-worst {
+    margin-top: 8px;
+    font-size: 12px;
+    color: #475467;
+
+    strong { color: #b42318; }
+    .batch-worst-file { color: #98a2b3; margin-left: 4px; }
+  }
+
+  .batch-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .batch-item {
+    display: flex;
+    gap: 10px;
+    padding: 8px 10px;
+    border: 1px solid #eceef1;
+    border-radius: 8px;
+    background: #ffffff;
+
+    .batch-item-thumb {
+      width: 62px;
+      height: 62px;
+      object-fit: cover;
+      border-radius: 6px;
+      flex-shrink: 0;
+      background: #f2f4f7;
+    }
+
+    .batch-item-main { flex: 1; min-width: 0; }
+
+    .bi-row1 {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      strong { font-size: 13px; color: #101828; }
+      .bi-file { font-size: 11px; color: #98a2b3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    }
+
+    .bi-row2 { margin-top: 2px; font-size: 11.5px; color: #667085; }
+
+    .bi-rx {
+      margin-top: 4px;
+      font-size: 11.5px;
+      line-height: 1.5;
+      color: #475467;
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+  }
+
+  /* 与历史弹窗同一套严重度徽标 */
+  .hi-sev {
+    font-style: normal;
+    font-size: 11px;
+    font-weight: 700;
+    border-radius: 999px;
+    padding: 1px 8px;
+    flex-shrink: 0;
+
+    &[data-sev='健康'] { color: #067647; background: #e7f6ef; }
+    &[data-sev='轻度'] { color: #b54708; background: #fef0c7; }
+    &[data-sev='中度'] { color: #b93815; background: #ffead5; }
+    &[data-sev='重度'] { color: #b42318; background: #fee4e2; }
+    &[data-sev='危急'] { color: #ffffff; background: #b42318; }
+  }
+
+  .batch-errors {
+    margin-top: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+
+    .batch-error-row {
+      font-size: 11.5px;
+      color: #b42318;
+      background: #fef3f2;
+      border-radius: 6px;
+      padding: 5px 9px;
     }
   }
 }

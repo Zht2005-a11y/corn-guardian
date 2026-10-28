@@ -10,7 +10,7 @@
 from __future__ import annotations
 
 import copy
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 KNOWLEDGE_BASE: Dict[str, Dict[str, Any]] = {
     "Blight": {
@@ -243,6 +243,88 @@ def get_prescription(class_en_name: str, max_drugs: int = 2) -> Dict[str, Any]:
         }
     )
     return rx
+
+
+# ── 动态处方：病害类型 × 严重度 × 受损率 × 置信度 ───────────────────────
+# 严重度档位 → (药液量/亩, 施药频次说明)
+_SEVERITY_DOSE = {
+    "危急": ("2.0 L/亩", "隔 5~7 天连喷 2~3 次"),
+    "重度": ("1.8 L/亩", "隔 7~10 天连喷 2 次"),
+    "中度": ("1.6 L/亩", "隔 7~10 天喷 1~2 次"),
+    "轻度": ("1.5 L/亩", "隔 10~14 天喷 1 次"),
+}
+
+
+def _severity_level(severity: str) -> str:
+    """从「重度 (III 级扩散期)」这类带描述的严重度里取出档位词。"""
+    for kw in ("危急", "重度", "中度", "轻度"):
+        if kw in (severity or ""):
+            return kw
+    return ""
+
+
+def compose_prescription(
+    class_en_name: str,
+    severity: str = "",
+    damage_rate: Optional[float] = None,
+    confidence: Optional[float] = None,
+    max_drugs: int = 2,
+) -> Dict[str, Any]:
+    """按本次识别结果动态生成飞防处方。
+
+    与 ``get_prescription()`` 的区别：同一病害在不同严重度下，**药液量、施药频次、
+    田间处置建议**都会变，不再是一段固定文案。
+
+    返回：
+      - sentence: 上屏文案（动态拼接）
+      - level: 严重度档位（危急/重度/中度/轻度/健康）
+      - dose: 本次药液量（L/亩）
+      - notes: 逐条依据（受损率提示 / 置信度提示）
+      - 其余为 get_prescription() 的结构化字段
+    """
+    base = get_prescription(class_en_name, max_drugs=max_drugs)
+    level = _severity_level(severity)
+    drugs_short = base.get("drugs_short") or ""
+    notes: List[str] = []
+
+    # 健康叶片：无药可开，给管理建议
+    if not drugs_short:
+        sentence = (
+            "当前未检出病斑，无需化学防治；保持水肥一体化管理，"
+            "抽雄前后遇连阴雨可做 1 次保护性预防施药。"
+        )
+        return {**base, "sentence": sentence, "level": "健康", "dose": "", "notes": notes}
+
+    dose, freq = _SEVERITY_DOSE.get(level, ("1.6 L/亩", "隔 7~10 天喷 1~2 次"))
+    timing = (base.get("timing") or "").strip()
+    focus = (base.get("focus") or "").strip()
+
+    head = f"选用 {drugs_short}"
+    # 轻度/中度还处在「发病初期」，施药时机有指导意义；重度/危急时已过窗口，省略以突出剂量
+    if timing and level in ("轻度", "中度"):
+        head += f"，{timing}施药"
+    head += f"，按 {dose} {freq}"
+    if focus:
+        head += f"；{focus}"
+    head += "。"
+
+    # 受损率越高，越需要先做田间清理再用药
+    if damage_rate is not None:
+        if damage_rate >= 30:
+            notes.append(f"受损 {damage_rate}%，建议先摘病叶带出田外再飞防。")
+        elif damage_rate >= 15:
+            notes.append(f"病斑集中（{damage_rate}%），重点覆盖病灶区。")
+    # 置信度不足时提醒复核，避免误判导致乱用药
+    if confidence is not None and confidence < 75:
+        notes.append(f"置信度偏低（{confidence}%），建议补拍复核后再施药。")
+
+    return {
+        **base,
+        "sentence": head + "".join(notes),
+        "level": level,
+        "dose": dose,
+        "notes": notes,
+    }
 
 
 def get_knowledge(class_en_name: str) -> Dict[str, Any]:

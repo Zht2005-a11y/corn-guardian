@@ -22,7 +22,7 @@ from PIL import Image
 from src.config import load_config
 from src import session_store
 from src import history_store
-from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge, get_prescription
+from src.knowledge_base import KNOWLEDGE_BASE, get_knowledge, get_prescription, compose_prescription
 from src.llm_client import ask_agnes, clear_session, stream_ask_agnes
 
 logger = logging.getLogger("corn_system.bigscreen_api")
@@ -313,32 +313,27 @@ class Base64PredictRequest(BaseModel):
 #            boxes[], prescription, droneParams, gradcam_base64, probabilities, model_used, inference_ms}
 # 注意：damageRate / severity 由 Grad-CAM 高响应区域估算，不是人工标注真值
 # ---------------------------------------------------------------------------
-@router.post("/predict")
-async def predict_screen(req: Base64PredictRequest):
-    """
-    大屏统一图像诊断接口：
-    传入图片 base64，由 ResNet50-CBAM 深度注意力模型进行推理，
-    返回：病害类型、置信度、Grad-CAM 热力图、病斑多尺度定位框 BBox、受损率、发病严重度与植保指导单。
+def _parse_b64_image(raw: str) -> bytes:
+    """接受纯 base64 或 data-url，返回图片字节。"""
+    if "," in raw and raw.strip().startswith("data:"):
+        raw = raw.split(",", 1)[1]
+    return base64.b64decode(raw, validate=True)
+
+
+def _diagnose_one(data: bytes, filename: str, model_key: str) -> Dict[str, Any]:
+    """单张图片的完整诊断链路：识别 → Grad-CAM → 病斑指标 → 动态处方 → 历史落盘。
+
+    单张接口与批量接口共用同一实现，保证两条路径的结果结构与落盘行为一致。
     """
     from app.api import PREDICTOR
 
     if PREDICTOR is None:
         raise HTTPException(status_code=503, detail="AI 模型正在加载中，请稍后")
 
-    raw = req.image_base64
-    if "," in raw and raw.strip().startswith("data:"):
-        raw = raw.split(",", 1)[1]
-
-    try:
-        data = base64.b64decode(raw, validate=True)
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Base64 图片解码失败: {e}")
-
-    model_key = req.model or "resnet50_cbam"
     if model_key not in PREDICTOR.models:
         model_key = PREDICTOR.default_model
 
-    res = PREDICTOR.predict_with_gradcam(data, req.filename or "sample.jpg", model_key=model_key)
+    res = PREDICTOR.predict_with_gradcam(data, filename or "sample.jpg", model_key=model_key)
     gradcam_res = res.get("gradcam", {})
     cam_raw = gradcam_res.get("cam_raw")
 
@@ -374,13 +369,14 @@ async def predict_screen(req: Base64PredictRequest):
 
     drone_params = get_drone_params(class_en, severity)
 
-    # 推荐药剂与防治指导建议
-    # 从结构化处方取药剂，不能直接取 control["chemical"][0]（那是「施药时机」句，
-    # 拼进「选用 …」模板会变成「选用 发病初期（…）及时施药。，利用…」）
-    if class_en == "Healthy":
-        prescription = "叶色浓绿无病斑，光合机构完整，建议保持常规滴灌水肥一体化管理并加强日常田间监测。"
-    else:
-        prescription = get_prescription(class_en)["sentence"]
+    # 动态处方：同一病害在不同严重度下，药液量/频次/田间处置建议均不同
+    rx = compose_prescription(
+        class_en,
+        severity=severity,
+        damage_rate=damage_rate,
+        confidence=round(conf * 100, 1),
+    )
+    prescription = rx["sentence"]
 
     result = {
         "diseaseName": f"{class_cn} ({kb.get('name_en', class_en)})",
@@ -393,6 +389,9 @@ async def predict_screen(req: Base64PredictRequest):
         "color": COLOR_MAP.get(class_en, "#059669"),
         "boxes": boxes,
         "prescription": prescription,
+        "prescriptionLevel": rx.get("level", ""),
+        "prescriptionDose": rx.get("dose", ""),
+        "prescriptionNotes": rx.get("notes", []),
         "droneParams": drone_params,
         "gradcam_base64": gradcam_res.get("overlay_base64", ""),
         "leaf_score": res.get("leaf_score", 0.95),
@@ -417,7 +416,129 @@ async def predict_screen(req: Base64PredictRequest):
         boxes=boxes,
     )
 
+    return result
+
+
+@router.post("/predict")
+async def predict_screen(req: Base64PredictRequest):
+    """
+    大屏统一图像诊断接口：
+    传入图片 base64，由 ResNet50-CBAM 深度注意力模型进行推理，
+    返回：病害类型、置信度、Grad-CAM 热力图、病斑多尺度定位框 BBox、受损率、
+    发病严重度、按严重度动态生成的飞防处方与作业参数。
+    """
+    try:
+        data = _parse_b64_image(req.image_base64)
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Base64 图片解码失败: {e}")
+
+    result = _diagnose_one(data, req.filename or "sample.jpg", req.model or "resnet50_cbam")
     return {"code": 0, "message": "ok", "data": result}
+
+
+class BatchImageItem(BaseModel):
+    """批量识别中的单张图片。"""
+
+    image_base64: str = Field(..., description="图片 base64（可带 data: 前缀）")
+    filename: Optional[str] = Field(None, description="原始文件名，仅用于展示")
+
+
+class BatchPredictRequest(BaseModel):
+    """POST /screen/predict/batch 的请求体。"""
+
+    images: List[BatchImageItem] = Field(..., description="待识别图片，单次最多 24 张")
+    model: Optional[str] = Field(None, description="模型 key，默认 resnet50_cbam")
+    acreage_per_image: float = Field(1.0, description="每张图代表的巡田面积（亩），用于估算总药液量")
+
+
+def _volume_per_mu(volume_text: str) -> float:
+    """从「2.0 L/亩」「1.0 L/亩 (叶面营养液)」这类文案里取出亩用量数值。"""
+    try:
+        head = str(volume_text).strip().split("L")[0].strip()
+        return float(head)
+    except Exception:
+        return 0.0
+
+
+@router.post("/predict/batch")
+async def predict_batch(req: BatchPredictRequest):
+    """批量巡田识别：逐张推理并落盘，返回明细与汇总（病害分布 / 平均受损率 / 建议药液量）。
+
+    单张失败不会中断整批，失败项进 errors（附带 index 与原因）。
+    """
+    if not req.images:
+        raise HTTPException(status_code=400, detail="images 不能为空")
+    if len(req.images) > 24:
+        raise HTTPException(status_code=400, detail="单次最多 24 张，请分批提交")
+
+    model_key = req.model or "resnet50_cbam"
+    acreage = max(0.1, float(req.acreage_per_image or 1.0))
+
+    items: List[Dict[str, Any]] = []
+    errors: List[Dict[str, Any]] = []
+
+    for idx, item in enumerate(req.images):
+        fname = item.filename or f"batch_{idx + 1}.jpg"
+        try:
+            data = _parse_b64_image(item.image_base64)
+            r = _diagnose_one(data, fname, model_key)
+            items.append(
+                {
+                    "index": idx,
+                    "filename": fname,
+                    "diseaseName": r["diseaseName"],
+                    "class_name_en": r["class_name_en"],
+                    "class_name_cn": r["class_name_cn"],
+                    "severity": r["severity"],
+                    "damageRate": r["damageRate"],
+                    "confidence": r["confidence"],
+                    "color": r["color"],
+                    "prescription": r["prescription"],
+                    "prescriptionLevel": r["prescriptionLevel"],
+                    "droneParams": r["droneParams"],
+                    "inference_ms": r["inference_ms"],
+                }
+            )
+        except Exception as e:  # noqa: BLE001
+            errors.append({"index": idx, "filename": fname, "error": str(e)[:160]})
+
+    # 汇总：病害分布 / 平均指标 / 建议总药液量
+    by_class: Dict[str, Dict[str, Any]] = {}
+    for it in items:
+        key = it["class_name_en"]
+        bucket = by_class.setdefault(
+            key, {"class_en": key, "name": it["class_name_cn"], "color": it["color"], "count": 0}
+        )
+        bucket["count"] += 1
+
+    total_volume = sum(_volume_per_mu(it["droneParams"].get("volume", "")) for it in items) * acreage
+    avg_damage = round(sum(it["damageRate"] for it in items) / len(items), 1) if items else 0.0
+    avg_conf = round(sum(it["confidence"] for it in items) / len(items), 1) if items else 0.0
+    worst = max(items, key=lambda x: x["damageRate"]) if items else None
+
+    summary = {
+        "count": len(req.images),
+        "success": len(items),
+        "failed": len(errors),
+        "acreage": acreage,
+        "byClass": sorted(by_class.values(), key=lambda x: x["count"], reverse=True),
+        "avgDamageRate": avg_damage,
+        "avgConfidence": avg_conf,
+        "totalVolumeLiters": round(total_volume, 1),
+        "worst": (
+            {
+                "filename": worst["filename"],
+                "diseaseName": worst["diseaseName"],
+                "severity": worst["severity"],
+                "damageRate": worst["damageRate"],
+            }
+            if worst
+            else None
+        ),
+    }
+
+    return {"code": 0, "message": "ok", "data": {"items": items, "errors": errors, "summary": summary}}
+
 
 
 # ==========================================================================
