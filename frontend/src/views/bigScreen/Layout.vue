@@ -2248,18 +2248,28 @@ function startNewSession() {
 let chatAbort = null
 
 // ── Typewriter 匀速缓冲（ChatGPT 手感的核心）────────────────────────────
-// LLM 吐 token 忽快忽慢（网络抖动 / 网关合批），直接来一个上屏一个会"哗蹦一段又停半秒"。
-// 这里把接收与显示拆开：delta 先进缓冲区，rAF 以固定帧率匀速取字上屏，
-// 用户看到的始终是稳定节奏的打字效果。生产者-消费者模式。
+// 两层效果：
+//   1) 匀速：delta 进缓冲区，rAF 固定帧率取字上屏，抹平网络的忽快忽慢；
+//   2) 渐变：记录每个字符的上屏时刻，渲染后给尾部"年轻"字符按年龄设置
+//      透明度（DOM 后处理），得到新字渐显的 gradient tail。
+//      之所以用逐字符内联 opacity 而非 CSS 动画：v-html 每帧全量替换
+//      innerHTML，CSS 动画会被反复重启造成闪烁；内联值是确定性的，不怕重挂载。
+const FADE_MS = 240        // 新字符从半透明到实体所需的时长
+const FADE_MIN_OP = 0.18   // 刚上屏字符的透明度下限（避免闪没）
+const FADE_MAX_CHARS = 36  // 参与渐变的最长字符数（控制 DOM 开销）
+
 function createTyper(onUpdate) {
   let pending = ''   // 已收到、待上屏
   let displayed = '' // 已上屏
+  let times = []     // displayed[i] 的上屏时刻（performance.now）
   let rafId = null
 
   function tick() {
     if (pending.length) {
       // 自适应取字量：底速 2 字/帧，积压越多吐得越快（封顶 10），保证既匀速又追得上高速流
       const take = Math.min(Math.max(2, Math.ceil(pending.length / 40)), 10, pending.length)
+      const now = performance.now()
+      for (let k = 0; k < take; k++) times.push(now)
       displayed += pending.slice(0, take)
       pending = pending.slice(take)
       onUpdate(displayed)
@@ -2272,10 +2282,12 @@ function createTyper(onUpdate) {
       pending += chunk
       if (rafId === null) rafId = requestAnimationFrame(tick)
     },
-    // 流结束/中断时调用：把余量一次性上屏，避免「网络已结束、UI 还在逐字蹦」
+    // 流结束/中断时调用：余量一次性上屏。时间戳回拨到渐变窗外 → 直接实心显示不闪烁
     flush() {
       if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
       if (pending.length) {
+        const past = performance.now() - FADE_MS * 2
+        for (let k = 0; k < pending.length; k++) times.push(past)
         displayed += pending
         pending = ''
         onUpdate(displayed)
@@ -2284,8 +2296,72 @@ function createTyper(onUpdate) {
     dispose() {
       if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
       pending = ''
+      times = []
+    },
+    // 尾部渐变窗口：仍在淡入期内的字符数 + 当前时刻
+    fadeInfo() {
+      const now = performance.now()
+      const cutoff = now - FADE_MS
+      let n = 0
+      for (let i = times.length - 1; i >= 0 && times[i] > cutoff; i--) n++
+      return { total: times.length, count: Math.min(n, FADE_MAX_CHARS), now }
+    },
+    timeAt(dIdx) {
+      return (dIdx >= 0 && dIdx < times.length) ? times[dIdx] : performance.now() - FADE_MS * 2
     }
   }
+}
+
+// 渲染后的 DOM 后处理：把流式气泡末尾"年轻"的字符包上带透明度的 span。
+// 每帧 v-html 全量替换会丢掉上一帧的 span，因此每帧按字符年龄重建即可。
+async function applyStreamingFade(bodyRef, typer) {
+  await nextTick()
+  if (!bodyRef.value) return
+  const mdEls = bodyRef.value.querySelectorAll('.msg-md')
+  const mdEl = mdEls[mdEls.length - 1]
+  if (!mdEl) return
+
+  const info = typer.fadeInfo()
+  if (info.count <= 0) {
+    clearFadeChars(mdEl)
+    return
+  }
+
+  const walker = document.createTreeWalker(mdEl, NodeFilter.SHOW_TEXT)
+  const nodes = []
+  while (walker.nextNode()) nodes.push(walker.currentNode)
+
+  let consumed = 0 // 已处理的渐变字符数（从文本末尾往前数）
+  for (let i = nodes.length - 1; i >= 0 && consumed < info.count; i--) {
+    const node = nodes[i]
+    const text = node.nodeValue
+    if (!text) continue
+    const take = Math.min(info.count - consumed, text.length)
+    const split = text.length - take
+    const frag = document.createDocumentFragment()
+    if (split > 0) frag.appendChild(document.createTextNode(text.slice(0, split)))
+    for (const ch of text.slice(split)) {
+      const dIdx = info.total - 1 - consumed // 该字符在 displayed 中的下标（近似映射）
+      const age = info.now - typer.timeAt(dIdx)
+      const op = Math.max(FADE_MIN_OP, Math.min(1, age / FADE_MS))
+      const sp = document.createElement('span')
+      sp.className = 'fade-ch'
+      sp.style.opacity = op.toFixed(3)
+      sp.textContent = ch
+      frag.appendChild(sp)
+      consumed++
+    }
+    node.parentNode.replaceChild(frag, node)
+  }
+}
+
+// 收尾：把渐变 span 还原成纯文本（避免流结束后透明度定格在半透明）
+function clearFadeChars(mdEl) {
+  const spans = mdEl.querySelectorAll('.fade-ch')
+  spans.forEach(sp => {
+    sp.parentNode.replaceChild(document.createTextNode(sp.textContent), sp)
+  })
+  if (spans.length) mdEl.normalize()
 }
 
 async function sendMessage() {
@@ -2313,6 +2389,9 @@ async function sendMessage() {
   let aiMsg = null // 本轮 AI 气泡的引用（首个 delta 时创建）
   chatAbort = null
 
+  // 渐变开关：系统开了"减少动态效果"时自动降级为纯打字机
+  let fadeActive = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)
+
   // 打字机缓冲：delta 不直接上屏，经 rAF 匀速释放（onUpdate 只在真正吐字时触发）
   const typer = createTyper((text) => {
     if (aiMsg) aiMsg.text = text
@@ -2320,6 +2399,8 @@ async function sendMessage() {
     if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
       body.scrollTop = body.scrollHeight
     }
+    // 渐变后处理：等 Vue 用新 innerHTML 渲染完，再给尾部字符按年龄上透明度
+    if (fadeActive) applyStreamingFade(chatBodyRef, typer)
   })
 
   try {
@@ -2429,10 +2510,18 @@ async function sendMessage() {
       }
     }
   } finally {
+    fadeActive = false
     // 兜底：任何路径退出都停掉 rAF 循环，防止计时器泄漏
     typer.dispose()
     aiTyping.value = false
     chatAbort = null
+    // 清掉可能残留的渐变 span（文本未再变化时 v-html 不会重渲染，需手动还原成纯文本）
+    nextTick(() => {
+      const body = chatBodyRef.value
+      if (!body) return
+      const els = body.querySelectorAll('.msg-md')
+      if (els.length) clearFadeChars(els[els.length - 1])
+    })
   }
 }
 
