@@ -123,9 +123,9 @@
                    Magic UI · PulsatingButton — 告警呼吸光环 -->
               <PulsatingButton
                 class="alerts-pill-btn"
-                pulse-color="rgba(23, 178, 106, 0.55)"
+                pulse-color="rgba(23, 178, 106, 0.75)"
                 duration="1.8s"
-                distance="10px"
+                distance="14px"
                 @click="activeModal = 'alerts'"
                 title="农场告警"
               >

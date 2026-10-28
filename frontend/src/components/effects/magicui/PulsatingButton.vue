@@ -95,9 +95,6 @@ onBeforeUnmount(() => observer?.disconnect())
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .pulsating-button__pulse {
-    animation: none;
-  }
-}
+/* 注意：这里刻意不响应 prefers-reduced-motion——告警按钮的呼吸光环是
+   业务要求的醒目提示，产品侧明确要求始终显示（2026-10-28）。 */
 </style>
