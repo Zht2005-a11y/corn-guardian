@@ -92,20 +92,21 @@
             <h1 class="header-title">玉米叶部病斑多尺度自适应感知与飞防决策系统</h1>
 
             <div class="header-right-tools">
-              <!-- 3 Alert Button (Figma Exact: 110x32, gradient #666 to #1a1a1a, radius 8px)
-                   Magic UI · PulsatingButton — 告警呼吸光环 -->
+              <!-- 告警按钮：数量来自 /screen/alerts（诊断自动生成），不再是写死的 3 条
+                   Magic UI · PulsatingButton — 有未读时才呼吸 -->
               <PulsatingButton
                 class="alerts-pill-btn"
+                :class="{ 'has-unread': alertStats.unread > 0 }"
                 pulse-color="rgba(23, 178, 106, 0.55)"
                 duration="1.8s"
                 distance="10px"
-                @click="activeModal = 'alerts'"
+                @click="openAlerts"
                 title="农场告警"
               >
                 <div class="notif-box">
                   <img src="/tanee/svg/dashboard/icon-7.svg" alt="告警" class="bell-svg"/>
                 </div>
-                <span class="alerts-txt">3 条告警</span>
+                <span class="alerts-txt">{{ alertStats.unread }} 条告警</span>
                 <svg class="arrow-up-right-svg" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2">
                   <path d="M4 12L12 4M12 4H6M12 4V10"/>
                 </svg>
@@ -311,11 +312,11 @@
                 <!-- Header: Disease Title + Severity Tag -->
                 <div class="dd-header-row">
                   <div class="dd-disease-info">
-                    <h4 class="dd-disease-title">{{ isDetected ? (currentSample?.diseaseName || '玉米大斑病 (Northern Corn Leaf Blight)') : (isDetecting ? 'AI 正在推理中...' : '待检测样本（等待诊断）') }}</h4>
-                    <span class="dd-pathogen-txt">{{ isDetected ? (currentSample?.pathogen || '病原菌：真菌，大斑凸脐蠕孢 (Exserohilum turcicum)') : (isDetecting ? '深度卷积注意力网络正在提取叶片表征特征...' : '尚未执行 AI 推理，请点击上方【开始诊断】按钮') }}</span>
+                    <h4 class="dd-disease-title">{{ rejectNotice ? '非目标图像（已拒识）' : (isDetected ? (currentSample?.diseaseName || '玉米大斑病 (Northern Corn Leaf Blight)') : (isDetecting ? 'AI 正在推理中...' : '待检测样本（等待诊断）')) }}</h4>
+                    <span class="dd-pathogen-txt">{{ rejectNotice ? '未检测到玉米叶片，本张图片不参与病害统计与处方生成' : (isDetected ? (currentSample?.pathogen || '病原菌：真菌，大斑凸脐蠕孢 (Exserohilum turcicum)') : (isDetecting ? '深度卷积注意力网络正在提取叶片表征特征...' : '尚未执行 AI 推理，请点击上方【开始诊断】按钮')) }}</span>
                   </div>
-                  <div class="dd-severity-badge" :style="{ backgroundColor: isDetected ? (currentSample?.color || '#e28557') : (isDetecting ? '#3b82f6' : '#667085') }">
-                    {{ isDetected ? (currentSample?.severity || '中度 (II 级扩展期)') : (isDetecting ? '推理中...' : '待诊断') }}
+                  <div class="dd-severity-badge" :style="{ backgroundColor: rejectNotice ? '#b42318' : (isDetected ? (currentSample?.color || '#e28557') : (isDetecting ? '#3b82f6' : '#667085')) }">
+                    {{ rejectNotice ? '拒识' : (isDetected ? (currentSample?.severity || '中度 (II 级扩展期)') : (isDetecting ? '推理中...' : '待诊断')) }}
                   </div>
                 </div>
 
@@ -364,13 +365,19 @@
                       <span class="flight-tag-icon">🚁 飞防作业决策与施药处方</span>
                     </div>
 
+                    <div v-if="rejectNotice" class="rx-reject-notice">
+                      ⚠️ {{ rejectNotice }}
+                    </div>
+
                     <p class="flight-prescription-txt" :class="{ 'waiting-txt': !isDetected }">
                       {{
-                        isDetected
-                          ? (currentSample?.prescription || '选用 40% 氟硅唑·多菌灵可湿性粉剂 1000倍液 或 苯醚甲环唑·嘧菌酯，利用大田植保无人机实施傍晚超低空微滴变量精准喷雾。')
-                          : (isDetecting
-                              ? '正在结合病斑注意力多尺度特征评估施药剂量与无人机航行参数...'
-                              : '图片已成功载入。请点击上方【开始诊断】按钮，系统将调用 ResNet50-CBAM 模型进行病斑多尺度定位与无人机处方生成。')
+                        rejectNotice
+                          ? '本次未生成处方：图像中未检测到玉米叶片。请对准叶片、避免逆光与强反光后重新拍摄。'
+                          : (isDetected
+                              ? (currentSample?.prescription || '')
+                              : (isDetecting
+                                  ? '正在结合病斑注意力多尺度特征评估施药剂量与无人机航行参数...'
+                                  : '图片已成功载入。请点击上方【开始诊断】按钮，系统将调用 ResNet50-CBAM 模型进行病斑多尺度定位与无人机处方生成。'))
                       }}
                     </p>
 
@@ -400,8 +407,8 @@
 
                     <!-- Weather Flight Suitability Notice -->
                     <div class="flight-weather-notice" :class="{ 'notice-waiting': !isDetected }">
-                      <span class="check-icon">{{ isDetected ? '✓' : 'ℹ' }}</span>
-                      <span>{{ isDetected ? '当前风速 2m/s、温度 19°C 满足低空飞防窗口，无漂移药害风险' : '待诊断完成后，系统将根据病斑受损率与气象窗口生成施药决策' }}</span>
+                      <span class="check-icon">{{ rejectNotice ? '!' : (isDetected ? '✓' : 'ℹ') }}</span>
+                      <span>{{ rejectNotice ? '未通过叶片校验，本次不进入用药与飞防参数计算' : (isDetected ? '当前风速 2m/s、温度 19°C 满足低空飞防窗口，无漂移药害风险' : '待诊断完成后，系统将根据病斑受损率与气象窗口生成施药决策') }}</span>
                     </div>
                   </div>
                 </div>
@@ -910,37 +917,47 @@
 
     <!-- ════════════════════ 3. INTERACTIVE DRAWERS & MODALS ════════════════════ -->
 
-    <!-- Alerts Drawer (3 Alerts) -->
+    <!-- Alerts Drawer（告警来自 /screen/alerts，由诊断结果自动生成） -->
     <div class="modal-backdrop-blur" v-if="activeModal === 'alerts'" @click.self="activeModal = null">
-      <div class="tanee-modal-card">
+      <div class="tanee-modal-card alerts-modal-card">
         <div class="t-modal-head">
           <div class="head-title-flex">
             <img src="/tanee/svg/dashboard/icon-7.svg" alt="Alert" class="modal-head-icon"/>
-            <h4>3 条活跃告警</h4>
+            <h4>{{ alertStats.unread }} 条未读告警</h4>
+            <span class="alerts-total-chip">今日 {{ alertStats.today }} · 共 {{ alertStats.total }}</span>
           </div>
           <button class="modal-close-btn" @click="activeModal = null">✕</button>
         </div>
-        <div class="t-modal-body">
-          <div class="alert-box-item warning">
-            <div class="alert-item-head">
-              <strong>⚠️ 湿度传感器 HIH-9370 信号中断</strong>
-              <span class="alert-time">08:02 AM</span>
-            </div>
-            <p>Smart Farm 01 温室 08 号分区传感器上报链路抖动，当前采用临界均值补插算法填补空缺遥测点。</p>
+        <div class="t-modal-body alerts-body">
+          <div class="alerts-toolbar">
+            <button class="alerts-tool-btn" :disabled="!alertStats.unread" @click="markAllAlertsRead">
+              全部标为已读
+            </button>
+            <button class="alerts-tool-btn ghost" @click="loadAlerts">刷新</button>
+            <label class="alerts-filter">
+              <input type="checkbox" v-model="alertsUnreadOnly" @change="loadAlerts"/>
+              只看未读
+            </label>
           </div>
-          <div class="alert-box-item urgent">
-            <div class="alert-item-head">
-              <strong>🚨 Plot PL-02J 玉米灰斑病菌孢子负荷预警</strong>
-              <span class="alert-time">09:15 AM</span>
-            </div>
-            <p>空气孢子捕捉量突破 124 粒/m³，叶面结露持续超 6.5 小时，已进入初侵染高危敏感窗口期！</p>
+
+          <div v-if="alertsLoading" class="alerts-empty">正在加载告警...</div>
+          <div v-else-if="alertsError" class="alerts-empty">{{ alertsError }}</div>
+          <div v-else-if="!alerts.length" class="alerts-empty">
+            暂无告警 —— 每次诊断会自动按规则生成（重病斑 / 低置信度 / 扩散风险）
           </div>
-          <div class="alert-box-item info">
-            <div class="alert-item-head">
-              <strong>ℹ️ 滴灌水肥一体机自动注液平衡完成</strong>
-              <span class="alert-time">07:30 AM</span>
+
+          <div v-else class="alerts-list">
+            <div v-for="a in alerts" :key="a.id" class="alert-box-item" :class="alertLevelClass(a.level)" :style="{ opacity: a.isRead ? 0.62 : 1 }">
+              <div class="alert-item-head">
+                <strong>{{ alertIcon(a.level) }} {{ a.title }}</strong>
+                <span class="alert-time">{{ fmtTime(a.created_at) }}</span>
+              </div>
+              <p>{{ a.detail }}</p>
+              <div class="alert-actions">
+                <button v-if="!a.isRead" class="alert-action-btn" @click="markAlertRead(a)">标为已读</button>
+                <button class="alert-action-btn danger" @click="removeAlert(a)">删除</button>
+              </div>
             </div>
-            <p>已向根际灌注螯合微肥 50g/株，实测土壤 pH 值由 7.8 稳定调整至标准适宜区间 7.6。</p>
           </div>
         </div>
       </div>
@@ -1118,6 +1135,14 @@
                 </div>
                 <div class="bi-rx">{{ it.prescription }}</div>
               </div>
+            </div>
+          </div>
+
+          <div v-if="batchRejected.length" class="batch-rejected">
+            <div class="batch-rejected-head">以下 {{ batchRejected.length }} 张未检测到玉米叶片，已拒识（不计入统计）</div>
+            <div v-for="r in batchRejected" :key="r.index" class="batch-reject-row">
+              <span class="br-name" :title="r.filename">{{ r.filename }}</span>
+              <span class="br-reason" :title="r.reason">已拒识</span>
             </div>
           </div>
 
@@ -1327,6 +1352,8 @@ const isDetected = ref(true)
 const showHeatmap = ref(false)
 const showBBoxes = ref(true)
 const inferenceSpeed = ref('14.2ms')
+// 非目标图像（未检测到玉米叶片）的提示文案；正常识别时为空
+const rejectNotice = ref('')
 
 // 植株健康度（Magic UI NumberTicker 消费的数值源）
 const plantHealthValue = computed(() =>
@@ -1387,6 +1414,7 @@ function processUploadedFile(file) {
       droneParams: null
     }
     isDetected.value = false
+    rejectNotice.value = ''
     showHeatmap.value = false
     // 导入图片后保持待诊断状态，不自动执行推理，等待用户点击“开始诊断”按钮
   }
@@ -1665,6 +1693,7 @@ function selectPreset(s, autoDetect = true) {
   currentSample.value = { ...s }
   previewUrl.value = s.imgData
   isDetected.value = false
+  rejectNotice.value = ''
   showHeatmap.value = false
   if (autoDetect) {
     runDetect()
@@ -1707,6 +1736,7 @@ function triggerCameraCapture() {
     droneParams: null
   }
   isDetected.value = false
+  rejectNotice.value = ''
   showHeatmap.value = false
   // 抓拍导入后保持待诊断状态，等待用户点击“开始诊断”
 }
@@ -1725,6 +1755,29 @@ async function runDetect() {
 
     if (res.data?.data) {
       const data = res.data.data
+
+      // 非目标图像：直接拒识，不出严重度/处方，也不计入统计
+      if (data.is_target === false) {
+        rejectNotice.value = data.reject_reason || '未检测到玉米叶片，请对准叶片重新拍摄'
+        isDetected.value = false
+        currentSample.value = {
+          ...currentSample.value,
+          diseaseName: '非目标图像',
+          class_name_en: '',
+          class_name_cn: '非目标图像',
+          severity: '—',
+          damageRate: 0,
+          confidence: data.confidence,
+          prescription: '',
+          droneParams: {},
+          boxes: [],
+          gradcam_base64: ''
+        }
+        inferenceSpeed.value = data.inference_ms + 'ms'
+        return
+      }
+
+      rejectNotice.value = ''
       currentSample.value = {
         ...currentSample.value,
         diseaseName: data.diseaseName,
@@ -1744,11 +1797,85 @@ async function runDetect() {
       isDetected.value = true
       inferenceSpeed.value = data.inference_ms + 'ms'
       refreshHistoryStats()
+      refreshAlertStats()
     }
   } catch (err) {
     console.error('推理检测失败:', err)
   } finally {
     isDetecting.value = false
+  }
+}
+
+// ── Alerts（诊断自动生成 · /screen/alerts）────────────────────────────
+const alerts = ref([])
+const alertStats = ref({ unread: 0, total: 0, today: 0 })
+const alertsLoading = ref(false)
+const alertsError = ref('')
+const alertsUnreadOnly = ref(false)
+
+const alertLevelClass = (level) => (level === 'urgent' ? 'urgent' : level === 'warning' ? 'warning' : 'info')
+const alertIcon = (level) => (level === 'urgent' ? '🚨' : level === 'warning' ? '⚠️' : 'ℹ️')
+
+async function loadAlerts() {
+  alertsLoading.value = true
+  alertsError.value = ''
+  try {
+    const res = await axios.get('/api/screen/alerts', {
+      params: { limit: 50, unread_only: alertsUnreadOnly.value },
+    })
+    const d = res.data?.data
+    if (d) {
+      alerts.value = d.items || []
+      alertStats.value = d.stats || { unread: 0, total: 0, today: 0 }
+    }
+  } catch (err) {
+    console.error('告警加载失败:', err)
+    alertsError.value = '告警加载失败，请检查后端服务'
+  } finally {
+    alertsLoading.value = false
+  }
+}
+
+// 只刷未读数（诊断结束后调用，避免每次拉全量列表）
+// 后端刚重启时首个请求可能失败，重试一次；失败不打扰界面
+async function refreshAlertStats(retry = 1) {
+  try {
+    const res = await axios.get('/api/screen/alerts', { params: { limit: 1 } })
+    if (res.data?.data?.stats) alertStats.value = res.data.data.stats
+  } catch {
+    if (retry > 0) setTimeout(() => refreshAlertStats(retry - 1), 1500)
+  }
+}
+
+function openAlerts() {
+  activeModal.value = 'alerts'
+  loadAlerts()
+}
+
+async function markAlertRead(a) {
+  try {
+    await axios.post(`/api/screen/alerts/${a.id}/read`)
+    await loadAlerts()
+  } catch (err) {
+    console.error('标记告警失败:', err)
+  }
+}
+
+async function markAllAlertsRead() {
+  try {
+    await axios.post('/api/screen/alerts/read-all')
+    await loadAlerts()
+  } catch (err) {
+    console.error('全部已读失败:', err)
+  }
+}
+
+async function removeAlert(a) {
+  try {
+    await axios.delete(`/api/screen/alerts/${a.id}`)
+    await loadAlerts()
+  } catch (err) {
+    console.error('删除告警失败:', err)
   }
 }
 
@@ -1821,11 +1948,13 @@ const batchInput = ref(null)
 const batchFiles = ref([])
 const batchItems = ref([])
 const batchErrors = ref([])
+const batchRejected = ref([])
 const batchSummary = ref(null)
 const batchRunning = ref(false)
 const batchElapsed = ref(0)
 const batchError = ref('')
 let batchTimer = null
+let alertPollTimer = null
 
 // 严重度带描述（"危急 (IV 级暴发期)"），徽标只显示档位词
 function sevKey(severity) {
@@ -1896,6 +2025,7 @@ function resetBatch() {
   batchFiles.value = []
   batchItems.value = []
   batchErrors.value = []
+  batchRejected.value = []
   batchSummary.value = null
   batchError.value = ''
 }
@@ -1907,6 +2037,7 @@ async function runBatch() {
   batchError.value = ''
   batchItems.value = []
   batchErrors.value = []
+  batchRejected.value = []
   batchSummary.value = null
   batchTimer = setInterval(() => { batchElapsed.value += 1 }, 1000)
 
@@ -1927,6 +2058,7 @@ async function runBatch() {
         _thumb: batchFiles.value[it.index]?.dataUrl || '',
       }))
       batchErrors.value = d.errors || []
+      batchRejected.value = d.rejected || []
       batchSummary.value = d.summary || null
       refreshHistoryStats()
     }
@@ -2354,6 +2486,8 @@ onMounted(() => {
   loadSamples()
   restartCarousel()
   refreshHistoryStats() // 个人中心「今日诊断」用真实计数
+  refreshAlertStats() // 顶部告警胶囊的未读数
+  alertPollTimer = setInterval(refreshAlertStats, 60000)
   // 灵动岛入场：从顶部缓缓落下
   if (islandEl.value) {
     gsap.from(islandEl.value, { y: -26, opacity: 0, duration: 0.6, delay: 0.35, ease: 'power3.out' })
@@ -2365,6 +2499,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', handleResize)
+  clearInterval(alertPollTimer)
   clearInterval(carouselTimer)
   cancelSnapBack()
   if (islandTween) islandTween.kill()
@@ -3157,7 +3292,9 @@ onUnmounted(() => {
   padding-top: 6px;
 
   .dd-metrics-subcol {
-    width: 36%;
+    /* 34%：处方区的机型字段会返回两个型号（“大疆 T60 / 极飞 P100 Pro”），
+       36% 时五列参数的间隙会被压到 10px，看起来粘连；34% 回到 13.8px 且左右均无溢出 */
+    width: 34%;
     display: flex;
     flex-direction: column;
     gap: 5px;
@@ -5260,6 +5397,149 @@ onUnmounted(() => {
       background: #fef3f2;
       border-radius: 6px;
       padding: 5px 9px;
+    }
+  }
+}
+/* ── Alerts（真实告警）───────────────────────────────────────────── */
+/* 没有未读告警时不再呼吸，避免"一直闪但没内容" */
+.alerts-pill-btn:not(.has-unread) :deep(.pulsating-button__pulse) {
+  animation: none;
+  opacity: 0;
+}
+
+.alerts-modal-card {
+  .alerts-total-chip {
+    margin-left: 10px;
+    font-size: 11.5px;
+    color: #475467;
+    background: #f2f4f7;
+    border-radius: 999px;
+    padding: 2px 10px;
+    white-space: nowrap;
+  }
+
+  .alerts-body {
+    max-height: 62vh;
+    overflow-y: auto;
+    padding: 12px 16px 16px;
+  }
+
+  .alerts-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .alerts-tool-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    border: 1px solid #d0d5dd;
+    border-radius: 6px;
+    background: #ffffff;
+    color: #344054;
+    cursor: pointer;
+
+    &:hover:not(:disabled) { border-color: #17b26a; color: #0f9755; }
+    &:disabled { opacity: 0.5; cursor: not-allowed; }
+    &.ghost { background: #f9fafb; }
+  }
+
+  .alerts-filter {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #475467;
+    cursor: pointer;
+
+    input { accent-color: #17b26a; }
+  }
+
+  .alerts-empty {
+    padding: 46px 0;
+    text-align: center;
+    font-size: 12.5px;
+    color: #98a2b3;
+  }
+
+  .alerts-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .alert-box-item {
+    .alert-actions {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .alert-action-btn {
+      padding: 2px 10px;
+      font-size: 11.5px;
+      border-radius: 5px;
+      border: 1px solid #d0d5dd;
+      background: #ffffff;
+      color: #475467;
+      cursor: pointer;
+
+      &:hover { border-color: #98a2b3; }
+      &.danger { color: #b42318; border-color: #fda29b; }
+      &.danger:hover { background: #fef3f2; }
+    }
+  }
+}
+/* 非目标图像拒识提示（决策卡内） */
+.rx-reject-notice {
+  margin: 4px 0 2px;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #fef3f2;
+  border: 1px solid #fda29b;
+  color: #b42318;
+  font-size: 12px;
+  line-height: 1.45;
+  flex: 0 0 auto;
+}
+
+/* 批量里被拒识的图片 */
+.batch-rejected {
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #fffaeb;
+  border: 1px solid #fedf89;
+
+  .batch-rejected-head {
+    font-size: 12px;
+    font-weight: 600;
+    color: #b54708;
+    margin-bottom: 4px;
+  }
+
+  .batch-reject-row {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 11.5px;
+    color: #93370d;
+    line-height: 1.7;
+
+    .br-name {
+      flex: 1 1 auto;
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .br-reason {
+      flex: 0 0 auto;
+      color: #b54708;
+      white-space: nowrap;
     }
   }
 }

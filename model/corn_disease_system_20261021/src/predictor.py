@@ -199,6 +199,16 @@ class _SingleModel:
         self.num_classes = num_classes
         self.weight_meta = meta
 
+        # 特征缓存：avgpool 输出（2048 维），供「非目标图像门控」算特征空间距离
+        self._feat: Optional[torch.Tensor] = None
+        self._feat_hook = None
+        pool = getattr(self.model, "avgpool", None)
+        if pool is not None:
+            self._feat_hook = pool.register_forward_hook(self._capture_feature)
+
+    def _capture_feature(self, _module, _inputs, output) -> None:
+        self._feat = output.detach().flatten(1)
+
     @torch.no_grad()
     def logits(self, tensors: torch.Tensor) -> torch.Tensor:
         return self.model(tensors.to(self.device))
@@ -289,6 +299,11 @@ class CornDiseasePredictor:
         if self.default_model not in self.models:
             self.default_model = next(iter(self.models))
 
+        # 非目标图像门控：类中心缺失时自动降级为「颜色 + 置信度」
+        from .image_gate import LeafGate
+
+        self.gate = LeafGate()
+
         self._gradcams: Dict[str, Any] = {}
 
     # ------------------------------------------------------------------
@@ -326,6 +341,7 @@ class CornDiseasePredictor:
         image_size: Optional[Tuple[int, int]] = None,
         filename: Optional[str] = None,
         leaf_score: Optional[float] = None,
+        gate: Optional[Dict[str, Any]] = None,
     ) -> Dict[str, Any]:
         order = np.argsort(prob)[::-1]
         idx = int(order[0])
@@ -344,6 +360,16 @@ class CornDiseasePredictor:
             warnings.append("图像色彩/纹理特征与玉米叶片差异较大，疑似非玉米叶片图片")
             is_valid_leaf = False
 
+        # 门控判定（颜色/植被指数 + 特征空间距离 + 置信度兜底）
+        is_target = True
+        gate_info: Dict[str, Any] = {}
+        if gate is not None:
+            is_target = bool(gate.get("is_target", True))
+            gate_info = gate
+            if not is_target:
+                warnings.append("未检测到玉米叶片：图像可能不是叶片（桌面/天空/截图等），已拒绝出方")
+                is_valid_leaf = False
+
         result = {
             "filename": filename,
             "class_index": idx,
@@ -355,6 +381,8 @@ class CornDiseasePredictor:
             "confidence_hint": hint,
             "is_healthy": self.class_names[idx].lower() == "healthy",
             "is_valid_leaf": is_valid_leaf,
+            "is_target": is_target,
+            "leaf_gate": gate_info,
             "warning": "；".join(warnings) if warnings else None,
             "top2": {
                 "class_name": self.class_cn[int(order[1])] if len(order) > 1 else None,
@@ -391,9 +419,12 @@ class CornDiseasePredictor:
         cache_key = hashlib.md5(data).hexdigest() if use_cache else None
         tensor = wrapper.preprocess(img, cache_key)
         prob, ms = self._infer_tensor(wrapper, tensor)
+        # 非目标图像门控：特征取 avgpool 输出（hook 在推理时已缓存）
+        feat = wrapper._feat.cpu().numpy()[0] if wrapper._feat is not None else None
+        gate = self.gate.evaluate(img, feat, prob, model_key=key)
         result = self._build_result(
             prob, ms, key, image_size=img.size,
-            filename=filename, leaf_score=leaf_likelihood_score(img),
+            filename=filename, leaf_score=leaf_likelihood_score(img), gate=gate,
         )
         if with_gradcam:
             result["gradcam"] = self.explain(img, tensor, wrapper, result["class_index"])
@@ -434,7 +465,7 @@ class CornDiseasePredictor:
                 continue
             ck = hashlib.md5(data).hexdigest()
             tensors.append(wrapper.preprocess(img, ck))
-            metas.append((name, img.size, leaf_likelihood_score(img)))
+            metas.append((name, img.size, leaf_likelihood_score(img), img))
 
         if tensors:
             if wrapper.device.type == "cuda":
@@ -446,10 +477,15 @@ class CornDiseasePredictor:
                     logits = wrapper.logits(chunk)
                     probs = torch.softmax(logits.float(), dim=1).cpu().numpy()
                 per = (time.perf_counter() - t_all) * 1000 / max(len(tensors), 1)
-                for (name, size, leafs), prob in zip(metas[i:i + batch_chunk], probs):
+                feats = wrapper._feat.cpu().numpy() if wrapper._feat is not None else None
+                for j, ((name, size, leafs, vimg), prob) in enumerate(
+                    zip(metas[i:i + batch_chunk], probs)
+                ):
                     # 批量场景用平均耗时估算单图耗时，避免逐张同步的开销失真
+                    feat = feats[j] if feats is not None else None
+                    gate = self.gate.evaluate(vimg, feat, prob, model_key=key)
                     results.append(self._build_result(prob, per, key, image_size=size,
-                                                      filename=name, leaf_score=leafs))
+                                                      filename=name, leaf_score=leafs, gate=gate))
             if wrapper.device.type == "cuda":
                 torch.cuda.synchronize()
 
