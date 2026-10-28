@@ -45,32 +45,12 @@
 
             <button
               class="nav-item-btn"
-              :class="{ active: activeNav === 'monitor' }"
-              @click="activeNav = 'monitor'"
-              title="监测数据"
-            >
-              <el-icon :size="20"><DataLine /></el-icon>
-              <span class="nav-label">监测数据</span>
-            </button>
-
-            <button
-              class="nav-item-btn"
               :class="{ active: activeNav === 'decision' }"
               @click="activeNav = 'decision'"
               title="飞防决策"
             >
               <el-icon :size="20"><Aim /></el-icon>
               <span class="nav-label">飞防决策</span>
-            </button>
-
-            <button
-              class="nav-item-btn"
-              :class="{ active: activeNav === 'history' }"
-              @click="activeNav = 'history'"
-              title="历史记录"
-            >
-              <el-icon :size="20"><Clock /></el-icon>
-              <span class="nav-label">历史记录</span>
             </button>
 
             <button
@@ -1220,7 +1200,7 @@
 
 <script setup>
 import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
-import { DataLine, Aim, Clock, Setting } from '@element-plus/icons-vue'
+import { Aim, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
 import gsap from 'gsap'
