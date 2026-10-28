@@ -900,7 +900,21 @@
                 >
                   <div v-if="msg.searchQuery" class="di-search-tag">🔍 已联网检索: {{ msg.searchQuery }}</div>
                   <div v-if="msg.role === 'user'" class="msg-plain">{{ msg.text }}</div>
-                  <div v-else class="msg-md" v-html="renderMsg(msg)"></div>
+                  <Streamdown
+                    v-else
+                    class="msg-stream"
+                    :class="{ 'is-streaming': aiTyping && i === messages.length - 1 }"
+                    :children="msg.text"
+                    :mode="aiTyping && i === messages.length - 1 ? 'streaming' : 'static'"
+                    :is-animating="aiTyping && i === messages.length - 1"
+                    :animated="{
+                      animation: 'blurIn',
+                      duration: 450,
+                      easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)',
+                      sep: 'word'
+                    }"
+                    caret="circle"
+                  />
                 </div>
               </div>
               <div v-if="isThinking" class="di-msg-row ai">
@@ -1330,13 +1344,16 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
 import { Aim, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
 import gsap from 'gsap'
-import { marked } from 'marked'
 import * as echarts from 'echarts'
+// Streamdown（Vue 版）：AI 流式 Markdown 渲染器，自带逐词渐显动画 + 流式光标，
+// 替代手写的字符级 fade 后处理（对齐 Vercel Streamdown / ChatGPT 的渐变吐字效果）
+import { Streamdown } from '@brucekit/streamdown-vue'
+import '@brucekit/streamdown-vue/styles.css'
 
 // ── Magic UI effects (shadcn registry · @magicui) ─────────────────────
 import MagicCard from '@/components/effects/magicui/MagicCard.vue'
@@ -2124,8 +2141,6 @@ const aiTyping = ref(false)
 const toolStatus = ref('')
 const chatBodyRef = ref(null)
 
-marked.setOptions({ gfm: true, breaks: true })
-
 // 思考中：消息已发出、首个 delta 未到、也无联网检索提示
 const isThinking = computed(
   () =>
@@ -2134,12 +2149,8 @@ const isThinking = computed(
     messages.value[messages.value.length - 1]?.role === 'user'
 )
 
-// AI 回复按 markdown 渲染（流式分片同样适用）；用户消息纯文本防注入
-function renderMsg(msg) {
-  if (msg.role === 'user') return ''
-  if (!msg.text) return ''
-  return marked.parse(msg.text)
-}
+// AI 回复的 Markdown 改由 <Streamdown> 组件渲染（模板内）：
+// 流式模式下自动修复残缺语法、逐词渐显、带光标；历史消息走 static 模式
 
 const fastQuestions = [
   '玉米灰斑病用什么药最有效？',
@@ -2247,6 +2258,47 @@ function startNewSession() {
 // （此前声明在 sendMessage 内部，导致点「停止」时抛 ReferenceError）
 let chatAbort = null
 
+// ── Typewriter 匀速缓冲（ChatGPT 手感的第一层）──────────────────────────
+// LLM 吐 token 忽快忽慢（网络抖动 / 网关合批），直接来一个上屏一个会"哗蹦一段又停半秒"。
+// 这里把接收与显示拆开：delta 先进缓冲区，rAF 以固定帧率匀速取字上屏；
+// 新字渐显（gradient tail）由 <Streamdown animated> 组件负责，两层各司其职。
+function createTyper(onUpdate) {
+  let pending = ''   // 已收到、待上屏
+  let displayed = '' // 已上屏
+  let rafId = null
+
+  function tick() {
+    if (pending.length) {
+      // 自适应取字量：底速 2 字/帧，积压越多吐得越快（封顶 10），保证既匀速又追得上高速流
+      const take = Math.min(Math.max(2, Math.ceil(pending.length / 40)), 10, pending.length)
+      displayed += pending.slice(0, take)
+      pending = pending.slice(take)
+      onUpdate(displayed)
+    }
+    rafId = pending.length ? requestAnimationFrame(tick) : null
+  }
+
+  return {
+    push(chunk) {
+      pending += chunk
+      if (rafId === null) rafId = requestAnimationFrame(tick)
+    },
+    // 流结束/中断时调用：把余量一次性上屏，避免「网络已结束、UI 还在逐字蹦」
+    flush() {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      if (pending.length) {
+        displayed += pending
+        pending = ''
+        onUpdate(displayed)
+      }
+    },
+    dispose() {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      pending = ''
+    }
+  }
+}
+
 async function sendMessage() {
   const query = inputText.value.trim()
   if (!query || aiTyping.value) return
@@ -2269,7 +2321,17 @@ async function sendMessage() {
   }
 
   let hasAiMsg = false
+  let aiMsg = null // 本轮 AI 气泡的引用（首个 delta 时创建）
   chatAbort = null
+
+  // 打字机缓冲：delta 不直接上屏，经 rAF 匀速释放（onUpdate 只在真正吐字时触发）
+  const typer = createTyper((text) => {
+    if (aiMsg) aiMsg.text = text
+    const body = chatBodyRef.value
+    if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
+      body.scrollTop = body.scrollHeight
+    }
+  })
 
   try {
     // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
@@ -2340,30 +2402,31 @@ async function sendMessage() {
           } else if (evt.type === 'delta') {
             if (!hasAiMsg) {
               hasAiMsg = true
-              messages.value.push({
+              aiMsg = reactive({
                 role: 'ai',
                 text: '',
                 searchQuery: toolStatus.value ? toolStatus.value.replace(/.*「(.*)」.*/, '$1') : ''
               })
+              messages.value.push(aiMsg)
             }
             toolStatus.value = ''
-            const lastMsg = messages.value[messages.value.length - 1]
-            lastMsg.text += evt.content
-            const body = chatBodyRef.value
-            if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
-              body.scrollTop = body.scrollHeight
-            }
+            // 进缓冲区由 rAF 匀速上屏，不再逐 chunk 直写
+            typer.push(evt.content)
           }
         } catch (e) {
           console.warn('解析流式消息异常:', e)
         }
       }
     }
+
+    // 流正常结束：把缓冲区余量一次性上屏
+    typer.flush()
   } catch (err) {
     if (err?.name === 'AbortError') {
-      // 用户主动停止：在已有回答后追加标记，避免误以为是异常
-      if (hasAiMsg) {
-        messages.value[messages.value.length - 1].text += '\n\n⏹ 已停止生成'
+      // 用户主动停止：先冲掉缓冲区已生成的内容，再追加标记，避免误以为是异常
+      typer.flush()
+      if (hasAiMsg && aiMsg) {
+        aiMsg.text += '\n\n⏹ 已停止生成'
       } else {
         messages.value.push({ role: 'ai', text: '⏹ 已停止生成。' })
       }
@@ -2377,6 +2440,8 @@ async function sendMessage() {
       }
     }
   } finally {
+    // 兜底：任何路径退出都停掉 rAF 循环，防止计时器泄漏
+    typer.dispose()
     aiTyping.value = false
     chatAbort = null
   }
@@ -4563,6 +4628,93 @@ onUnmounted(() => {
           a { color: #6ee7b0; text-decoration: underline; }
 
           hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.14); margin: 8px 0; }
+        }
+
+        /* Streamdown（Vue 版）渲染容器：跟随深色气泡配色。
+           库默认样式面向浅色背景（shadcn 变量），这里整体反转成继承气泡文字色 */
+        :deep(.msg-stream) {
+          font-size: 12.5px;
+          line-height: 1.55;
+          word-break: break-word;
+          color: rgba(232, 234, 237, 0.92);
+
+          p { margin: 0 0 6px; &:last-child { margin-bottom: 0; } }
+
+          h1, h2, h3, h4, h5, h6 {
+            margin: 8px 0 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+          }
+
+          ul, ol { margin: 4px 0; padding-left: 18px; li { margin: 2px 0; } }
+
+          strong { color: #ffffff; font-weight: 700; }
+
+          code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11.5px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: #7ee2a8;
+          }
+
+          pre {
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 6px 0;
+            overflow-x: auto;
+
+            code { background: none; padding: 0; color: #d7dce2; }
+          }
+
+          a { color: #6ee7b0; text-decoration: underline; }
+
+          table {
+            border-collapse: collapse;
+            margin: 6px 0;
+            font-size: 11.5px;
+            max-width: 100%;
+
+            th, td {
+              border: 1px solid rgba(255, 255, 255, 0.14);
+              padding: 5px 9px;
+              text-align: left;
+            }
+
+            th {
+              background: rgba(255, 255, 255, 0.08);
+              color: #ffffff;
+              font-weight: 600;
+            }
+
+            tr:nth-child(even) td { background: rgba(255, 255, 255, 0.04); }
+          }
+
+          blockquote {
+            margin: 6px 0;
+            padding: 4px 10px;
+            border-left: 3px solid #35c56e;
+            background: rgba(53, 197, 110, 0.08);
+            border-radius: 0 6px 6px 0;
+            color: rgba(232, 234, 237, 0.85);
+          }
+
+          /* 流式光标（库自带 circle caret）：用品牌绿 */
+          [data-streamdown-caret],
+          .sd-caret {
+            background-color: #35c56e !important;
+          }
+        }
+
+        /* 技术三：渐变遮罩——正在流式的块底缘做柔和淡出，
+           新内容像从雾里"长"出来，而不是硬切换出现 */
+        :deep(.msg-stream.is-streaming > *:last-child) {
+          -webkit-mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 86%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 86%, transparent 100%);
         }
       }
 
