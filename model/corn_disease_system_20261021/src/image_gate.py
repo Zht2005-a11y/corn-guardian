@@ -1,17 +1,25 @@
 """非目标图像门控 —— 判断输入是不是「玉米叶片」，不重新训练模型。
 
-问题：4 分类 softmax 一定会在 4 个病名里挑一个，对桌面、天空、截图、纯色也会
-输出「玉米锈病 0.62」，前端照旧给处方。
+为什么需要：4 分类 softmax 一定会在 4 个病名里挑一个，桌面、天空、绿墙、草地也会
+输出「玉米锈病 0.69」，前端照旧给处方。
 
-做法（三者取或，任一满足即认为像叶片）：
-  1. 颜色/植被指数：绿色像素占比、超绿指数 ExG —— 明显是绿色组织的直接放行；
-  2. 特征空间余弦距离：模型 avgpool 特征到已知类中心的距离（类中心由训练集离线统计，
-     见 scripts/build_gate_centroids.py）—— 颜色不像但特征像（黄褐色重病叶、逆光叶）；
-  3. 置信度兜底：仅在类中心文件缺失时启用（阈值更严）。
+判定逻辑（按顺序短路，任一命中即通过）：
 
-阈值默认值来自 MCDD 测试集（48 张真叶）+ 截图/纯色/噪声/渐变（12 张）实测：
-  正样本 48/48 通过，负样本 12/12 拦截（见提交说明）。
-可用环境变量微调：LEAF_GATE_GREEN / LEAF_GATE_EXG / LEAF_GATE_COS。
+  1. 特征距离 ≤ 0.60                       —— 和已知四类的特征中心很像，直接放行
+  2. 纹理过平（< 0.012）                    —— 纯色、模糊、纯绿渐变，直接拒
+  3. 有颜色证据 且 特征距离 ≤ 0.65          —— 绿色/黄褐色组织 + 特征接近
+  4. 特征距离 ≤ 0.82 且 top1 ≥ 0.90
+     且 top1-top2 ≥ 0.80                    —— 病斑占满整叶时特征会被拉偏，
+                                              但模型极其笃定，仍判为叶片
+  否则判为非目标。
+
+注意：颜色**不再单独放行**。早期版本只要绿色占比 ≥0.25 就通过，结果纯绿图片
+（纯色、噪声、渐变）全部漏网，这是本次修复的核心。
+
+类中心按模型分别统计（不同网络的 avgpool 特征空间不可混用），
+由 scripts/build_gate_centroids.py 生成到 assets/gate/centroids.npz。
+阈值可用环境变量覆盖：LEAF_GATE_COS / LEAF_GATE_COLOR_COS / LEAF_GATE_GREEN /
+LEAF_GATE_EXG / LEAF_GATE_RESCUE_COS / LEAF_GATE_MIN_TEXTURE。
 """
 from __future__ import annotations
 
@@ -32,22 +40,24 @@ def _env_float(name: str, default: float) -> float:
         return default
 
 
-# 颜色白名单（明显是绿色植物组织）
-GREEN_RATIO_PASS = _env_float("LEAF_GATE_GREEN", 0.25)
-EXG_PASS = _env_float("LEAF_GATE_EXG", 0.10)
-# 特征距离（越小越像）
+# 特征距离主阈值
 COS_PASS = _env_float("LEAF_GATE_COS", 0.60)
-# 灰区救援：特征距离略远、但模型极其自信时放行（重病斑叶片特征会偏离健康叶中心）
-COS_GRAY = _env_float("LEAF_GATE_COS_GRAY", 0.85)
-CONF_RESCUE = _env_float("LEAF_GATE_CONF_RESCUE", 0.90)
-MARGIN_RESCUE = _env_float("LEAF_GATE_MARGIN_RESCUE", 0.30)
-# 无类中心时的置信度兜底
-CONF_PASS = _env_float("LEAF_GATE_CONF", 0.85)
-MARGIN_PASS = _env_float("LEAF_GATE_MARGIN", 0.20)
+# 颜色证据 + 特征距离（放宽一档）
+COLOR_COS = _env_float("LEAF_GATE_COLOR_COS", 0.65)
+GREEN_RATIO = _env_float("LEAF_GATE_GREEN", 0.35)
+EXG_MIN = _env_float("LEAF_GATE_EXG", 0.12)
+# 纹理下限：低于此值视为纯色 / 模糊
+MIN_TEXTURE = _env_float("LEAF_GATE_MIN_TEXTURE", 0.012)
+# 灰区救援：特征偏大但模型极笃定
+RESCUE_COS = _env_float("LEAF_GATE_RESCUE_COS", 0.82)
+RESCUE_TOP1 = _env_float("LEAF_GATE_RESCUE_TOP1", 0.90)
+RESCUE_MARGIN = _env_float("LEAF_GATE_RESCUE_MARGIN", 0.80)
+# 完全没有类中心时的兜底
+FALLBACK_TOP1 = _env_float("LEAF_GATE_FALLBACK_TOP1", 0.85)
 
 
 def color_metrics(img: Image.Image) -> Dict[str, float]:
-    """颜色/纹理统计（0~1 量纲，便于打印与调阈值）。"""
+    """颜色 / 纹理统计（0~1 量纲）。"""
     arr = np.asarray(img.convert("RGB").resize((160, 160), Image.BILINEAR), dtype=np.float32) / 255.0
     r, g, b = arr[..., 0], arr[..., 1], arr[..., 2]
     exg = 2 * g - r - b
@@ -65,18 +75,26 @@ def color_metrics(img: Image.Image) -> Dict[str, float]:
 
 
 class LeafGate:
-    """加载类中心并提供 evaluate()；类中心缺失时降级为「颜色 + 置信度」判断。"""
+    """按模型加载类中心并提供 evaluate()。"""
 
     def __init__(self, centroids_path: Optional[str | Path] = None) -> None:
         self.path = Path(centroids_path) if centroids_path else _ASSET
-        self.centroids: Dict[str, np.ndarray] = {}
+        self.centroids: Dict[str, Dict[str, np.ndarray]] = {}
         self._load()
 
     def _load(self) -> None:
+        """npz 的键形如 'resnet50_cbam::Blight'；兼容旧的纯类名键（视为 cbam）。"""
         try:
-            if self.path.exists():
-                data = np.load(self.path)
-                self.centroids = {k: data[k].astype(np.float32) for k in data.files}
+            if not self.path.exists():
+                return
+            data = np.load(self.path)
+            for k in data.files:
+                vec = data[k].astype(np.float32)
+                if "::" in k:
+                    model_key, cls = k.split("::", 1)
+                else:
+                    model_key, cls = "resnet50_cbam", k
+                self.centroids.setdefault(model_key, {})[cls] = vec
         except Exception:  # noqa: BLE001
             self.centroids = {}
 
@@ -84,27 +102,26 @@ class LeafGate:
     def ready(self) -> bool:
         return bool(self.centroids)
 
+    def models(self):
+        return sorted(self.centroids)
+
     def evaluate(
         self,
         img: Image.Image,
         feature: Optional[np.ndarray] = None,
         prob: Optional[np.ndarray] = None,
+        model_key: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """返回 {is_target, score, reasons, metrics}。"""
         cm = color_metrics(img)
         metrics: Dict[str, Any] = dict(cm)
         reasons = []
 
-        color_hit = cm["green_ratio"] >= GREEN_RATIO_PASS or cm["exg_mean"] >= EXG_PASS
-        if color_hit:
-            reasons.append("颜色/植被指数符合叶片特征")
-
+        cents = self.centroids.get(model_key or "", {})
         cos_dist = None
-        if feature is not None and self.ready:
+        if feature is not None and cents:
             f = feature.astype(np.float32).ravel()
-            n = float(np.linalg.norm(f)) + 1e-8
-            fn = f / n
-            cos_dist = min(1.0 - float(fn @ c) for c in self.centroids.values())
+            f = f / (float(np.linalg.norm(f)) + 1e-8)
+            cos_dist = min(1.0 - float(f @ c) for c in cents.values())
             metrics["cos_dist"] = round(cos_dist, 4)
 
         margin = None
@@ -114,54 +131,48 @@ class LeafGate:
             metrics["margin"] = round(float(s[0] - s[1]), 4)
             margin = float(s[0] - s[1])
 
-        feature_hit = cos_dist is not None and cos_dist <= COS_PASS
-        if feature_hit:
-            reasons.append(f"特征接近已知类别（距离 {cos_dist:.2f}）")
+        color_ok = cm["green_ratio"] >= GREEN_RATIO or cm["exg_mean"] >= EXG_MIN
+        metrics["color_ok"] = color_ok
+        metrics["gate_model"] = model_key or ""
 
-        # 灰区救援：距离偏大但模型极自信（典型是病斑占满的叶片，特征被病斑拉偏）
-        rescue_hit = False
-        if (
-            cos_dist is not None
-            and not feature_hit
-            and cos_dist <= COS_GRAY
-            and metrics.get("top1", 0.0) >= CONF_RESCUE
-            and (margin is None or margin >= MARGIN_RESCUE)
-        ):
-            rescue_hit = True
-            reasons.append(
-                f"特征距离偏大（{cos_dist:.2f}）但置信度极高（{metrics['top1']:.2f}），判为病斑异常样本"
-            )
-
-        # 类中心不可用时，退化为置信度兜底（更严，宁拦勿放）
-        conf_hit = False
-        if not self.ready and prob is not None:
-            conf_hit = (
-                metrics.get("top1", 0.0) >= CONF_PASS
-                and (margin is None or margin >= MARGIN_PASS)
-            )
-            if conf_hit:
-                reasons.append("置信度与间隔达到阈值（无类中心，兜底判断）")
-
-        is_target = bool(color_hit or feature_hit or conf_hit or rescue_hit)
-        if not is_target:
-            if cos_dist is not None:
-                reasons.append(f"颜色不像叶片，且特征距离 {cos_dist:.2f} > {COS_PASS}")
+        is_target = False
+        if cos_dist is not None:
+            if cos_dist <= COS_PASS:
+                is_target = True
+                reasons.append(f"特征接近已知类别（距离 {cos_dist:.2f}）")
+            elif cm["texture"] < MIN_TEXTURE:
+                is_target = False
+                reasons.append(f"纹理过于平坦（{cm['texture']:.3f}），判为纯色/模糊图")
+            elif color_ok and cos_dist <= COLOR_COS:
+                is_target = True
+                reasons.append(f"颜色符合叶片组织且特征可接受（距离 {cos_dist:.2f}）")
+            elif (
+                cos_dist <= RESCUE_COS
+                and metrics.get("top1", 0) >= RESCUE_TOP1
+                and (margin is None or margin >= RESCUE_MARGIN)
+            ):
+                is_target = True
+                reasons.append(
+                    f"特征偏大（{cos_dist:.2f}）但模型极笃定"
+                    f"（{metrics['top1']:.2f}/{margin:.2f}），判为病斑异常叶片"
+                )
             else:
-                reasons.append("颜色与置信度均不满足叶片条件")
+                reasons.append(f"特征距离 {cos_dist:.2f} 超出阈值，且不满足颜色/置信度条件")
+        else:
+            # 没有该模型的类中心：只用颜色 + 置信度兜底，并明确标注
+            is_target = bool(color_ok and metrics.get("top1", 0) >= FALLBACK_TOP1)
+            reasons.append("缺少该模型的类中心，使用颜色+置信度兜底判断")
 
-        # 综合分数：越像 1 越像叶片
         score = 0.0
-        if color_hit:
-            score = max(score, 0.75)
-        if feature_hit:
-            score = max(score, min(0.95, 1.0 - cos_dist / max(COS_PASS, 1e-6) * 0.25))
-        if conf_hit:
+        if cos_dist is not None:
+            score = round(max(0.0, min(1.0, 1.0 - cos_dist)), 3)
+        if is_target:
             score = max(score, 0.6)
 
         return {
-            "is_target": is_target,
-            "score": round(float(score), 3),
+            "is_target": bool(is_target),
+            "score": score,
             "reasons": reasons,
             "metrics": metrics,
-            "centroids": len(self.centroids),
+            "models": self.models(),
         }

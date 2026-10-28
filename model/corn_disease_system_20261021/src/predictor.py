@@ -421,7 +421,7 @@ class CornDiseasePredictor:
         prob, ms = self._infer_tensor(wrapper, tensor)
         # 非目标图像门控：特征取 avgpool 输出（hook 在推理时已缓存）
         feat = wrapper._feat.cpu().numpy()[0] if wrapper._feat is not None else None
-        gate = self.gate.evaluate(img, feat, prob)
+        gate = self.gate.evaluate(img, feat, prob, model_key=key)
         result = self._build_result(
             prob, ms, key, image_size=img.size,
             filename=filename, leaf_score=leaf_likelihood_score(img), gate=gate,
@@ -483,7 +483,7 @@ class CornDiseasePredictor:
                 ):
                     # 批量场景用平均耗时估算单图耗时，避免逐张同步的开销失真
                     feat = feats[j] if feats is not None else None
-                    gate = self.gate.evaluate(vimg, feat, prob)
+                    gate = self.gate.evaluate(vimg, feat, prob, model_key=key)
                     results.append(self._build_result(prob, per, key, image_size=size,
                                                       filename=name, leaf_score=leafs, gate=gate))
             if wrapper.device.type == "cuda":
