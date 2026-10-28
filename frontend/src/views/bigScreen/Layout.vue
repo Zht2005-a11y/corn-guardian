@@ -3292,7 +3292,9 @@ onUnmounted(() => {
   padding-top: 6px;
 
   .dd-metrics-subcol {
-    width: 36%;
+    /* 34%：处方区的机型字段会返回两个型号（“大疆 T60 / 极飞 P100 Pro”），
+       36% 时五列参数的间隙会被压到 10px，看起来粘连；34% 回到 13.8px 且左右均无溢出 */
+    width: 34%;
     display: flex;
     flex-direction: column;
     gap: 5px;
