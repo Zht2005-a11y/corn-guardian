@@ -1,27 +1,29 @@
-"""登录认证模块（用户库 + 密码哈希 + 无状态签名令牌）。
+"""登录认证模块（用户库 + 密码哈希 + JWT）。
 
 设计取舍
 --------
-* **不引入 PyJWT / passlib**：项目 requirements 里没有这些包，为了"装上就能跑"，
-  令牌用 HMAC-SHA256 自签（base64url(payload) + "." + base64url(sig)），
-  密码用标准库 ``hashlib.pbkdf2_hmac``。安全性等价于 HS256 JWT。
+* **令牌用标准 JWT（HS256）**：由 PyJWT 签发与校验，claims 含
+  ``sub / uid / name / role / iss / aud / iat / nbf / exp / jti``。
+  运行环境没装 PyJWT 时自动退化为内置 HS256 实现——header/payload/签名
+  与 PyJWT 完全一致（可互相签发校验），保证"装上就能跑"。
+* **密码用标准库 ``hashlib.pbkdf2_hmac``**：210000 轮 + 16 字节随机盐。
 * **用户库用 SQLite**：与 ``src/history_store.py`` 同一个 history 目录，
   整个目录已在 .gitignore 中排除，运行时不污染仓库。
-* **令牌两种投递方式**：``Authorization: Bearer`` 为主；
-  另外兼容 ``?token=``（EventSource / <img> 这类不能带 header 的场景）。
-* **退出登录**：令牌是无状态的，服务端用 ``revoked_tokens`` 表记录 jti 实现立即失效。
+* **令牌三种投递方式**：``Authorization: Bearer`` 为主；另兼容 ``?token=``
+  （EventSource / <img> 这类不能带 header 的场景）与 Cookie ``corn_token``。
+* **退出登录**：JWT 是无状态的，服务端用 ``revoked_tokens`` 表记录 jti 实现立即失效。
 
-令牌格式（三段式，肉眼可调试）::
+令牌样例（标准 JWT，可在 jwt.io 用密钥验签）::
 
-    eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc2MTYwMDAwMH0.9f3c...（payload.signature）
+    eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhZG1pbiIsImV4cCI6MTc2MTYwMDAwMH0.9f3c...
 
 接口一览（挂在 /auth 前缀，无需令牌即可访问 login/register）::
 
-    POST /auth/login      {username, password, remember}  -> {token, expires_in, user}
+    POST /auth/login      {username, password, remember}  -> {token, token_type, expires_in, user}
     POST /auth/register   {username, password, display_name}
     GET  /auth/me                                         -> {user}
     POST /auth/logout                                      -> 注销当前令牌
-    GET  /auth/config                                     -> 注册开关 / 演示账号提示
+    GET  /auth/config                                     -> 注册开关 / JWT 算法 / 演示账号提示
 
 环境变量
 --------
@@ -133,6 +135,8 @@ def _verify_password(password: str, salt_hex: str, expected_hex: str, iterations
 def _load_secret() -> bytes:
     env = os.environ.get("CORN_AUTH_SECRET", "").strip()
     if env:
+        if len(env) < 32:
+            logger.warning("CORN_AUTH_SECRET 仅 %d 字节，HS256 建议至少 32 字节", len(env))
         return env.encode("utf-8")
     if SECRET_PATH.exists():
         try:
@@ -214,38 +218,128 @@ def get_user(username: str) -> Optional[sqlite3.Row]:
 
 
 # ==========================================================================
-#  令牌签发 / 校验
+#  JWT 签发 / 校验（HS256）
 # ==========================================================================
-def issue_token(user: sqlite3.Row, ttl_hours: int = TOKEN_TTL_HOURS) -> Tuple[str, int]:
+JWT_ALG = "HS256"
+JWT_ISSUER = "corn-guardian"
+JWT_AUDIENCE = "corn-guardian-web"
+JWT_REQUIRED_CLAIMS = ["sub", "exp", "iat", "jti"]
+
+try:  # 首选 PyJWT：标准实现，claims / 时间窗校验最严谨
+    import jwt as _pyjwt
+    from jwt import ExpiredSignatureError as _JwtExpired
+    from jwt import InvalidTokenError as _JwtInvalid
+
+    JWT_BACKEND = f"PyJWT {_pyjwt.__version__}"
+except ImportError:  # pragma: no cover - 离线环境兜底
+    _pyjwt = None
+    JWT_BACKEND = "builtin-hs256"
+
+
+def _b64url_json(obj: Dict[str, Any]) -> str:
+    raw = json.dumps(obj, separators=(",", ":"), sort_keys=True, ensure_ascii=False).encode("utf-8")
+    return _b64e(raw)
+
+
+def _builtin_encode(payload: Dict[str, Any]) -> str:
+    """内置 HS256 实现，产出与 PyJWT 完全一致的 JWT。"""
+    segments = [
+        _b64url_json({"alg": JWT_ALG, "typ": "JWT"}),
+        _b64url_json(payload),
+    ]
+    signing_input = ".".join(segments).encode("ascii")
+    signature = hmac.new(_secret(), signing_input, hashlib.sha256).digest()
+    return ".".join(segments + [_b64e(signature)])
+
+
+def _builtin_decode(token: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    try:
+        header_b64, payload_b64, signature_b64 = token.split(".")
+    except ValueError:
+        return None, "invalid"
+
+    try:
+        header = json.loads(_b64d(header_b64).decode("utf-8"))
+        if not isinstance(header, dict) or header.get("alg") != JWT_ALG:
+            return None, "invalid"
+        signing_input = f"{header_b64}.{payload_b64}".encode("ascii")
+        expected = hmac.new(_secret(), signing_input, hashlib.sha256).digest()
+        if not hmac.compare_digest(_b64d(signature_b64), expected):
+            return None, "invalid"
+        payload = json.loads(_b64d(payload_b64).decode("utf-8"))
+    except (ValueError, json.JSONDecodeError, UnicodeDecodeError, AttributeError):
+        return None, "invalid"
+
+    if not isinstance(payload, dict) or any(k not in payload for k in JWT_REQUIRED_CLAIMS):
+        return None, "invalid"
+    if payload.get("iss") != JWT_ISSUER or payload.get("aud") != JWT_AUDIENCE:
+        return None, "invalid"
+
     now = _now()
-    exp = now + ttl_hours * 3600
-    payload = {
+    if int(payload.get("exp", 0)) <= now:
+        return None, "expired"
+    if int(payload.get("nbf", 0)) > now:
+        return None, "invalid"
+    return payload, None
+
+
+def build_claims(user: sqlite3.Row, ttl_hours: int = TOKEN_TTL_HOURS) -> Dict[str, Any]:
+    """JWT 载荷。iss/aud/nbf 一并写入，便于网关侧做标准校验。"""
+    now = _now()
+    return {
         "sub": user["username"],
         "uid": user["id"],
         "name": user["display_name"] or user["username"],
         "role": user["role"],
+        "iss": JWT_ISSUER,
+        "aud": JWT_AUDIENCE,
         "iat": now,
-        "exp": exp,
+        "nbf": now,
+        "exp": now + ttl_hours * 3600,
         "jti": secrets.token_urlsafe(12),
     }
-    body = _b64e(json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode("utf-8"))
-    sig = _b64e(hmac.new(_secret(), body.encode("ascii"), hashlib.sha256).digest())
-    return f"{body}.{sig}", exp
 
 
-def decode_token(token: str) -> Optional[Dict[str, Any]]:
-    """校验签名与有效期，成功返回 payload，失败返回 None。"""
-    try:
-        body, sig = token.split(".", 1)
-        expect = _b64e(hmac.new(_secret(), body.encode("ascii"), hashlib.sha256).digest())
-        if not hmac.compare_digest(sig, expect):
-            return None
-        payload = json.loads(_b64d(body).decode("utf-8"))
-    except (ValueError, json.JSONDecodeError, UnicodeDecodeError):
-        return None
-    if not isinstance(payload, dict) or int(payload.get("exp", 0)) < _now():
-        return None
-    return payload
+def issue_token(user: sqlite3.Row, ttl_hours: int = TOKEN_TTL_HOURS) -> Tuple[str, int]:
+    """签发 JWT，返回 (token, exp 时间戳)。"""
+    claims = build_claims(user, ttl_hours)
+    if _pyjwt is not None:
+        token = _pyjwt.encode(claims, _secret(), algorithm=JWT_ALG)
+        if isinstance(token, bytes):  # PyJWT 1.x 兼容
+            token = token.decode("ascii")
+    else:
+        token = _builtin_encode(claims)
+    return token, int(claims["exp"])
+
+
+def decode_token(token: str) -> Tuple[Optional[Dict[str, Any]], Optional[str]]:
+    """校验 JWT，返回 (payload, reason)。
+
+    成功为 ``(payload, None)``；失败为 ``(None, "expired" | "invalid")``，
+    调用方据此给出"登录已过期"或"凭证无效"的差异化提示。
+    """
+    if not token:
+        return None, "invalid"
+
+    if _pyjwt is not None:
+        try:
+            payload = _pyjwt.decode(
+                token,
+                _secret(),
+                algorithms=[JWT_ALG],
+                audience=JWT_AUDIENCE,
+                issuer=JWT_ISSUER,
+                options={"require": JWT_REQUIRED_CLAIMS},
+            )
+            return payload, None
+        except _JwtExpired:
+            return None, "expired"
+        except _JwtInvalid:
+            return None, "invalid"
+        except Exception:  # noqa: BLE001 - 任何解析异常都按无效处理，不能 500
+            return None, "invalid"
+
+    return _builtin_decode(token)
 
 
 def revoke_token(payload: Dict[str, Any]) -> None:
@@ -302,11 +396,12 @@ def check_request(request: Request) -> Optional[Tuple[int, Dict[str, Any]]]:
 
     token = extract_token(request)
     if not token:
-        return 401, {"code": 401, "message": "未登录或登录已过期，请先登录", "data": None}
+        return 401, {"code": 401, "message": "未登录，请先登录", "data": None}
 
-    payload = decode_token(token)
+    payload, reason = decode_token(token)
     if payload is None:
-        return 401, {"code": 401, "message": "登录凭证无效或已过期，请重新登录", "data": None}
+        message = "登录已过期，请重新登录" if reason == "expired" else "登录凭证无效，请重新登录"
+        return 401, {"code": 401, "message": message, "data": None}
     if _is_revoked(payload.get("jti", "")):
         return 401, {"code": 401, "message": "该登录凭证已注销，请重新登录", "data": None}
 
@@ -393,6 +488,9 @@ async def auth_config():
             "allow_register": _allow_register(),
             "token_ttl_hours": TOKEN_TTL_HOURS,
             "remember_ttl_hours": TOKEN_TTL_HOURS_REMEMBER,
+            "jwt_alg": JWT_ALG,
+            "jwt_issuer": JWT_ISSUER,
+            "jwt_backend": JWT_BACKEND,
             "demo_accounts": [
                 {"username": u["username"], "password": u["password"], "role_label": ROLE_LABELS.get(u["role"], u["role"])}
                 for u in DEFAULT_USERS
@@ -489,9 +587,9 @@ async def register(body: RegisterBody):
 @router.get("/me", summary="当前登录用户")
 async def me(request: Request):
     token = extract_token(request)
-    payload = decode_token(token) if token else None
+    payload, reason = decode_token(token)
     if payload is None:
-        return _err(401, "登录状态已失效，请重新登录")
+        return _err(401, "登录已过期，请重新登录" if reason == "expired" else "登录状态已失效，请重新登录")
     if _is_revoked(payload.get("jti", "")):
         return _err(401, "该登录凭证已注销，请重新登录")
     row = get_user(payload.get("sub", ""))
@@ -503,7 +601,7 @@ async def me(request: Request):
 @router.post("/logout", summary="退出登录")
 async def logout(request: Request):
     token = extract_token(request)
-    payload = decode_token(token) if token else None
+    payload, _ = decode_token(token)
     if payload:
         revoke_token(payload)
     response = JSONResponse(content={"code": 0, "message": "已退出登录", "data": None})
