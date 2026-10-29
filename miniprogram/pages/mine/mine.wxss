@@ -39,7 +39,6 @@
 .menu-item:last-child { border-bottom: none; }
 .menu-item image:first-child { width: 36rpx; height: 36rpx; }
 .menu-item .arrow { width: 28rpx; height: 28rpx; margin-left: auto; }
-.menu-val { margin-left: auto; font-size: 22rpx; color: #8C999C; }
 
 .about {
   text-align: center;

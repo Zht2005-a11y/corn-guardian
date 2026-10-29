@@ -40,11 +40,6 @@
       <text>识别历史</text>
       <image class="arrow" src="{{icons.arrow}}" mode="aspectFit" />
     </view>
-    <view class="menu-item" bindtap="showApi">
-      <image src="{{icons.model}}" mode="aspectFit" />
-      <text>后端服务地址</text>
-      <text class="menu-val">{{apiBase}}</text>
-    </view>
     <view wx:if="{{loggedIn}}" class="menu-item" bindtap="doLogout">
       <image src="{{icons.user}}" mode="aspectFit" />
       <text>退出登录</text>
