@@ -5,23 +5,82 @@
  */
 const { BASE_URL } = require('./config');
 
+let hasAlertedDebug = false;
+
+function notifyDebugGuidanceIfNeeded() {
+  if (hasAlertedDebug) return;
+  try {
+    const accountInfo = wx.getAccountInfoSync && wx.getAccountInfoSync();
+    const envVersion = accountInfo && accountInfo.miniProgram && accountInfo.miniProgram.envVersion;
+    if (envVersion === 'trial' || envVersion === 'develop') {
+      hasAlertedDebug = true;
+      wx.showModal({
+        title: '体验版网络连接提示',
+        content: '当前后端使用测试服务器 IP。如出现无法连接，请点击右上角「...」菜单 -> 选择「打开调试」(vConsole) -> 重启小程序即可正常使用！',
+        confirmText: '我知道了',
+        showCancel: false
+      });
+    }
+  } catch (e) {}
+}
+
+/**
+ * 规范化 URL 拼接，避免 BASE_URL 末尾与 path 开头产生冗余双斜杠（如 /api//screen）
+ */
+function buildUrl(path) {
+  const base = (BASE_URL || '').replace(/\/+$/, '');
+  const sub = (path || '').replace(/^\/+/, '');
+  return base ? `${base}/${sub}` : `/${sub}`;
+}
+
 function request(path, method, data) {
+  const url = buildUrl(path);
+  const verb = method || 'GET';
+  const t0 = Date.now();
   return new Promise((resolve, reject) => {
     wx.request({
-      url: BASE_URL + path,
-      method: method || 'GET',
+      url: url,
+      method: verb,
       data: data,
-      timeout: 30000,
+      // 服务端实测较慢（单请求可达 20s+），30s 容易误判为不可达
+      timeout: 45000,
       success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300 && res.data && res.data.code === 0) {
-          resolve(res.data.data);
-        } else {
-          const detail = (res.data && (res.data.detail || res.data.message)) || ('HTTP ' + res.statusCode);
-          reject(new Error(detail));
+        const cost = Date.now() - t0;
+        const body = res.data;
+        const h = res.header || {};
+        const rid = h['X-Request-Id'] || h['x-request-id'] || '';
+        // 打印完整响应，体验版开调试后可在 vConsole 直接看到
+        console.log('[api] ' + verb + ' ' + url + ' -> ' + res.statusCode + ' (' + cost + 'ms)'
+          + (rid ? ' rid=' + rid : ''), body);
+        if (res.statusCode >= 200 && res.statusCode < 300 && body && body.code === 0) {
+          resolve(body.data);
+          return;
         }
+        const detail = (body && (body.detail || body.message)) || ('HTTP ' + res.statusCode);
+        const err = new Error(detail + '（HTTP ' + res.statusCode + ' · ' + cost + 'ms'
+          + (rid ? ' · ' + rid : '') + '）');
+        err.statusCode = res.statusCode;
+        err.body = body;
+        err.url = url;
+        reject(err);
       },
       fail(err) {
-        reject(new Error('无法连接后端服务(' + BASE_URL + ')，请确认已运行 run_backend.bat：' + (err.errMsg || '')));
+        const cost = Date.now() - t0;
+        notifyDebugGuidanceIfNeeded();
+        const msg = (err && err.errMsg) || '';
+        let hint = '';
+        if (msg.indexOf('url not in domain list') >= 0 || msg.indexOf('CLEARTEXT') >= 0) {
+          hint = '（微信拦截了该域名：体验版请点右上角「···」→「开发调试」后彻底关闭再重开）';
+        } else if (msg.toLowerCase().indexOf('timeout') >= 0) {
+          hint = '（已等待 ' + cost + 'ms 无响应，服务端过慢或不可达）';
+        } else {
+          hint = '（无法建立连接：请确认后端 8082 端口从手机网络可达）';
+        }
+        console.error('[api] fail ' + verb + ' ' + url + ' (' + cost + 'ms) ' + msg);
+        const e = new Error('请求失败 [' + url + ']：' + msg + hint);
+        e.url = url;
+        e.errMsg = msg;
+        reject(e);
       }
     });
   });
@@ -73,6 +132,9 @@ function compressToDataUrl(filePath) {
 }
 
 const api = {
+  buildUrl,
+  notifyDebugGuidanceIfNeeded,
+
   /** 四类典型样本（含真实数据集 base64 图） */
   getSamples: () => request('/screen/samples'),
 
