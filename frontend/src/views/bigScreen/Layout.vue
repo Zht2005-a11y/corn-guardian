@@ -215,7 +215,6 @@
                       </svg>
                     </div>
                     <div class="wb-title-text-wrap">
-                      <h3 class="wb-main-title">玉米叶部病斑多尺度自适应感知</h3>
                       <span class="wb-model-tag">ResNet50-CBAM · 注意力机制</span>
                     </div>
                   </div>
