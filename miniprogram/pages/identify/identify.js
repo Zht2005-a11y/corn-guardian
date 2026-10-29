@@ -5,6 +5,12 @@ const util = require('../../utils/util');
 const app = getApp();
 
 Page({
+  onShow() {
+    if (typeof this.getTabBar === 'function' && this.getTabBar()) {
+      this.getTabBar().setData({ selected: 1 });
+    }
+  },
+
   data: {
     modes: [
       { key: 'single', label: '单张识别' },

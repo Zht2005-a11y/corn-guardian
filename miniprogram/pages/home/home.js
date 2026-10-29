@@ -48,7 +48,7 @@ Page({
         });
       })
       .catch(() => {
-        this.setData({ weather: { temp: '', desc: '未连接', humidity: '--', wind: '--' } });
+        this.setData({ weather: { temp: '', desc: '', humidity: '', wind: '', failed: true } });
       });
   },
 
@@ -66,12 +66,13 @@ Page({
   },
 
   go(e) {
-    wx.navigateTo({ url: e.currentTarget.dataset.url });
+    // 病害识别 / AI 问答是 tabBar 页面，必须走 switchTab，否则点击无响应
+    util.navigate(e.currentTarget.dataset.url);
   },
   goMonitor() {
-    wx.navigateTo({ url: '/pages/monitor/monitor' });
+    util.navigate('/pages/monitor/monitor');
   },
   goHistory() {
-    wx.navigateTo({ url: '/pages/history/history' });
+    util.navigate('/pages/history/history');
   }
 });

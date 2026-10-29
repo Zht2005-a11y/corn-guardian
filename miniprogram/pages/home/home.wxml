@@ -10,13 +10,46 @@
     <view class="hero-top">
       <view class="loc-pill">
         <image class="loc-icon" src="{{icons.location}}" mode="aspectFit" />
-        <text>示范田块 · 河南周口</text>
+        <text>示范田块 · 贵阳乌当</text>
       </view>
     </view>
 
     <view class="hero-title-wrap">
       <view class="hero-title">玉米叶部病害智能诊断\n与无人机飞防决策系统</view>
       <view class="hero-sub">AI 识别 · 精准施药 · 科学植保</view>
+    </view>
+
+    <!-- 田间气象：玻璃质感浮层，压在主视觉底部 -->
+    <view class="hero-weather" bindtap="goMonitor">
+      <block wx:if="{{weather.temp !== ''}}">
+        <view class="hw-main">
+          <image class="hw-icon" src="{{icons.sun}}" mode="aspectFit" />
+          <view class="hw-temp-wrap">
+            <text class="hw-temp">{{weather.temp}}</text>
+            <text class="hw-desc">{{weather.desc}}</text>
+          </view>
+        </view>
+        <view class="hw-split"></view>
+        <view class="hw-metrics">
+          <view class="hw-item">
+            <image src="{{icons.humidity}}" mode="aspectFit" />
+            <text>{{weather.humidity}}%</text>
+          </view>
+          <view class="hw-item">
+            <image src="{{icons.wind}}" mode="aspectFit" />
+            <text>{{weather.wind}}m/s</text>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="hw-loading">
+        <block wx:if="{{weather.failed}}">
+          <text>气象数据暂不可用</text>
+        </block>
+        <block wx:else>
+          <text class="loading-dot"></text>
+          <text>正在获取田间气象…</text>
+        </block>
+      </view>
     </view>
   </view>
 
@@ -53,32 +86,6 @@
         </view>
         <view class="func-name">识别历史</view>
         <view class="func-desc">查看历史记录</view>
-      </view>
-    </view>
-
-    <!-- 天气卡片 -->
-    <view class="card weather-card" bindtap="goMonitor" style="height: 137rpx; display: flex; box-sizing: border-box">
-      <block wx:if="{{weather.temp !== ''}}">
-        <view class="weather-left">
-          <image class="weather-icon" src="{{icons.sun}}" mode="aspectFit" />
-          <view class="weather-temp">
-            <text class="t">{{weather.temp}}</text>
-            <text class="desc">{{weather.desc}}</text>
-          </view>
-        </view>
-        <view class="weather-right">
-          <view class="w-item">
-            <image src="{{icons.humidity}}" mode="aspectFit" />
-            <text>湿度 {{weather.humidity}}%</text>
-          </view>
-          <view class="w-item">
-            <image src="{{icons.wind}}" mode="aspectFit" />
-            <text>风速 {{weather.wind}}m/s</text>
-          </view>
-        </view>
-      </block>
-      <view wx:else class="center-tip">
-        <text class="loading-dot"></text>正在获取田间气象…
       </view>
     </view>
 

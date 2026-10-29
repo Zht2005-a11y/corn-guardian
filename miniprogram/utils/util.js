@@ -28,4 +28,27 @@ function classNameOf(classEn) {
   return CLASS_NAMES[classEn] || classEn || '未知';
 }
 
-module.exports = { formatTime, severityTag, classNameOf, CLASS_NAMES };
+/**
+ * tabBar 页面清单，必须与 app.json 的 tabBar.list 保持一致。
+ * 微信规定 tabBar 页面只能用 wx.switchTab 打开，用 navigateTo 会静默失败
+ * （控制台报 can not navigateTo a tabbar page），表现就是「点了没反应」。
+ */
+const TAB_PAGES = [
+  '/pages/home/home',
+  '/pages/identify/identify',
+  '/pages/assistant/assistant',
+  '/pages/mine/mine'
+];
+
+/** 统一跳转入口：自动判断目标是否为 tabBar 页面 */
+function navigate(url) {
+  if (!url) return;
+  const target = url.charAt(0) === '/' ? url : '/' + url;
+  if (TAB_PAGES.indexOf(target) >= 0) {
+    wx.switchTab({ url: target });
+    return;
+  }
+  wx.navigateTo({ url: target });
+}
+
+module.exports = { formatTime, severityTag, classNameOf, CLASS_NAMES, TAB_PAGES, navigate };

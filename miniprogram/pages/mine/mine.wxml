@@ -3,9 +3,10 @@
   <view class="card profile-card">
     <view class="avatar">{{initial}}</view>
     <view class="p-info">
-      <view class="p-name">种植户用户</view>
-      <view class="p-sub">玉米叶部病斑多尺度感知系统</view>
+      <view class="p-name">{{user.display_name || user.username || '种植户用户'}}</view>
+      <view class="p-sub">{{loggedIn ? ('账号：' + user.username + ' · 已登录') : '未登录 · 部分接口可能无法访问'}}</view>
     </view>
+    <view class="p-action" bindtap="goLogin">{{loggedIn ? '切换' : '登录'}}</view>
   </view>
 
   <!-- 统计 -->
@@ -39,10 +40,10 @@
       <text>识别历史</text>
       <image class="arrow" src="{{icons.arrow}}" mode="aspectFit" />
     </view>
-    <view class="menu-item" bindtap="showApi">
-      <image src="{{icons.model}}" mode="aspectFit" />
-      <text>后端服务地址</text>
-      <text class="menu-val">{{apiBase}}</text>
+    <view wx:if="{{loggedIn}}" class="menu-item" bindtap="doLogout">
+      <image src="{{icons.user}}" mode="aspectFit" />
+      <text>退出登录</text>
+      <image class="arrow" src="{{icons.arrow}}" mode="aspectFit" />
     </view>
   </view>
 

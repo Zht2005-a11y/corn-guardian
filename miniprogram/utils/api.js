@@ -5,23 +5,117 @@
  */
 const { BASE_URL } = require('./config');
 
-function request(path, method, data) {
+let hasAlertedDebug = false;
+
+function notifyDebugGuidanceIfNeeded() {
+  if (hasAlertedDebug) return;
+  try {
+    const accountInfo = wx.getAccountInfoSync && wx.getAccountInfoSync();
+    const envVersion = accountInfo && accountInfo.miniProgram && accountInfo.miniProgram.envVersion;
+    if (envVersion === 'trial' || envVersion === 'develop') {
+      hasAlertedDebug = true;
+      wx.showModal({
+        title: '体验版网络连接提示',
+        content: '当前后端使用测试服务器 IP。如出现无法连接，请点击右上角「...」菜单 -> 选择「打开调试」(vConsole) -> 重启小程序即可正常使用！',
+        confirmText: '我知道了',
+        showCancel: false
+      });
+    }
+  } catch (e) {}
+}
+
+/**
+ * 规范化 URL 拼接，避免 BASE_URL 末尾与 path 开头产生冗余双斜杠（如 /api//screen）
+ */
+function buildUrl(path) {
+  const base = (BASE_URL || '').replace(/\/+$/, '');
+  const sub = (path || '').replace(/^\/+/, '');
+  return base ? `${base}/${sub}` : `/${sub}`;
+}
+
+const TOKEN_KEY = 'corn_token';
+
+/**
+ * 后端 /screen/* 需要 Bearer 令牌（auth.py 中间件），登录后把 token 存到
+ * storage 的 corn_token 即可自动带上；未登录时后端会返回 401。
+ */
+function authHeader() {
+  try {
+    const token = wx.getStorageSync(TOKEN_KEY);
+    return token ? { Authorization: 'Bearer ' + token } : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function buildHttpError(res, body, cost, rid, url) {
+  const detail = (body && (body.detail || body.message)) || ('HTTP ' + res.statusCode);
+  let suffix = '（HTTP ' + res.statusCode + ' · ' + cost + 'ms' + (rid ? ' · ' + rid : '') + '）';
+  if (res.statusCode === 401) {
+    suffix = '（登录态失效，已尝试自动重新登录 · ' + cost + 'ms）';
+  } else if (res.statusCode === 200 && typeof body === 'string') {
+    suffix = '（返回的是 HTML 而不是 JSON，通常说明 nginx 没把接口反代到后端）';
+  }
+  const err = new Error(detail + suffix);
+  err.statusCode = res.statusCode;
+  err.body = body;
+  err.url = url;
+  return err;
+}
+
+function request(path, method, data, retried) {
+  const url = buildUrl(path);
+  const verb = method || 'GET';
+  const t0 = Date.now();
   return new Promise((resolve, reject) => {
     wx.request({
-      url: BASE_URL + path,
-      method: method || 'GET',
+      url: url,
+      method: verb,
       data: data,
-      timeout: 30000,
+      header: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
+      // 服务端实测较慢（单请求可达 20s+），30s 容易误判为不可达
+      timeout: 45000,
       success(res) {
-        if (res.statusCode >= 200 && res.statusCode < 300 && res.data && res.data.code === 0) {
-          resolve(res.data.data);
-        } else {
-          const detail = (res.data && (res.data.detail || res.data.message)) || ('HTTP ' + res.statusCode);
-          reject(new Error(detail));
+        const cost = Date.now() - t0;
+        const body = res.data;
+        const h = res.header || {};
+        const rid = h['X-Request-Id'] || h['x-request-id'] || '';
+        // 打印完整响应，体验版开调试后可在 vConsole 直接看到
+        console.log('[api] ' + verb + ' ' + url + ' -> ' + res.statusCode + ' (' + cost + 'ms)'
+          + (rid ? ' rid=' + rid : ''), body);
+        if (res.statusCode >= 200 && res.statusCode < 300 && body && body.code === 0) {
+          resolve(body.data);
+          return;
         }
+        const err = buildHttpError(res, body, cost, rid, url);
+        // 401：令牌缺失或过期时，用内置测试账号静默重登并重试一次（/auth/* 自身不重试，避免死循环）
+        if (res.statusCode === 401 && !retried && path.indexOf('/auth/') !== 0) {
+          const auth = require('./auth');
+          auth.relogin()
+            .then(() => request(path, method, data, true))
+            .then(resolve)
+            .catch(() => reject(err));
+          return;
+        }
+        reject(err);
       },
       fail(err) {
-        reject(new Error('无法连接后端服务(' + BASE_URL + ')，请确认已运行 run_backend.bat：' + (err.errMsg || '')));
+        const cost = Date.now() - t0;
+        notifyDebugGuidanceIfNeeded();
+        const msg = (err && err.errMsg) || '';
+        let hint = '';
+        if (msg.indexOf('url not in domain list') >= 0 || msg.indexOf('CLEARTEXT') >= 0) {
+          hint = '（微信拦截了该域名：体验版请点右上角「···」→「开发调试」后彻底关闭再重开）';
+        } else if (msg.toLowerCase().indexOf('timeout') >= 0) {
+          hint = '（已等待 ' + cost + 'ms 无响应，服务端过慢或不可达）';
+        } else {
+          hint = '（无法建立连接：请确认后端 8082 端口从手机网络可达）';
+        }
+        console.error('[api] fail ' + verb + ' ' + url + ' (' + cost + 'ms) ' + msg);
+        const e = new Error('请求失败 [' + url + ']：' + msg + hint);
+        e.url = url;
+        e.errMsg = msg;
+        reject(e);
       }
     });
   });
@@ -73,6 +167,11 @@ function compressToDataUrl(filePath) {
 }
 
 const api = {
+  buildUrl,
+  authHeader,
+  TOKEN_KEY,
+  notifyDebugGuidanceIfNeeded,
+
   /** 四类典型样本（含真实数据集 base64 图） */
   getSamples: () => request('/screen/samples'),
 
@@ -106,6 +205,23 @@ const api = {
   sessionList: (limit) => request('/screen/sessions?limit=' + (limit || 30)),
   sessionDetail: (sid) => request('/screen/sessions/' + sid),
   sessionDelete: (sid) => request('/screen/sessions/' + sid, 'DELETE'),
+
+  /** 账号认证（后端 /auth/*，登录成功返回 {token, user, expires_in}） */
+  login: (username, password, remember) =>
+    request('/auth/login', 'POST', {
+      username: username,
+      password: password,
+      remember: !!remember
+    }),
+  register: (username, password, displayName) =>
+    request('/auth/register', 'POST', {
+      username: username,
+      password: password,
+      display_name: displayName || username
+    }),
+  me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', 'POST', {}),
+  authConfig: () => request('/auth/config'),
 
   compressToDataUrl,
   fileToDataUrl,

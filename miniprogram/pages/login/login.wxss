@@ -1,0 +1,141 @@
+/* 登录 / 注册页 —— 沿用全局浅色自然风格与品牌绿 */
+.login-page {
+  min-height: 100vh;
+  padding: 60rpx 40rpx calc(40rpx + env(safe-area-inset-bottom));
+  background: linear-gradient(180deg, #EAF5F5 0%, #F2F8F8 45%, #F7FBFB 100%);
+  box-sizing: border-box;
+}
+
+.brand {
+  text-align: center;
+  margin: 20rpx 0 46rpx;
+}
+.brand-logo {
+  width: 108rpx;
+  height: 108rpx;
+  margin: 0 auto 22rpx;
+  border-radius: 32rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 44rpx;
+  font-weight: 700;
+  color: #FFFFFF;
+  background: linear-gradient(135deg, #19C995, #079B76);
+  box-shadow: 0 10rpx 26rpx rgba(11, 167, 123, 0.28);
+}
+.brand-title {
+  font-size: 38rpx;
+  font-weight: 600;
+  color: var(--text-1);
+  letter-spacing: 1rpx;
+}
+.brand-sub {
+  margin-top: 12rpx;
+  font-size: 24rpx;
+  color: var(--text-3);
+}
+
+.form-card {
+  padding: 32rpx 30rpx 34rpx;
+}
+
+.tabs {
+  display: flex;
+  background: #EAF1F1;
+  border-radius: 999rpx;
+  padding: 6rpx;
+  margin-bottom: 34rpx;
+}
+.tabs .tab {
+  flex: 1;
+  text-align: center;
+  padding: 16rpx 0;
+  border-radius: 999rpx;
+  font-size: 27rpx;
+  color: var(--text-2);
+}
+.tabs .tab.active {
+  background: #FFFFFF;
+  color: var(--brand);
+  font-weight: 600;
+  box-shadow: 0 2rpx 10rpx rgba(42, 84, 78, 0.08);
+}
+
+.field { margin-bottom: 26rpx; }
+.field .label {
+  display: block;
+  font-size: 24rpx;
+  color: var(--text-3);
+  margin-bottom: 12rpx;
+}
+.field .input {
+  width: 100%;
+  height: 92rpx;
+  padding: 0 26rpx;
+  box-sizing: border-box;
+  border-radius: 22rpx;
+  background: #F4F8F8;
+  border: 1rpx solid var(--line);
+  font-size: 29rpx;
+  color: var(--text-1);
+}
+.ph { color: #B7C1C3; }
+
+.row-between {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 4rpx 0 30rpx;
+}
+.remember { display: flex; align-items: center; }
+.checkbox {
+  width: 34rpx;
+  height: 34rpx;
+  margin-right: 12rpx;
+  border-radius: 9rpx;
+  border: 2rpx solid #CBD6D8;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22rpx;
+  color: #FFFFFF;
+}
+.checkbox.on {
+  background: var(--brand);
+  border-color: var(--brand);
+}
+.remember-text { font-size: 24rpx; color: var(--text-2); }
+.demo-link { font-size: 24rpx; color: var(--brand); }
+
+.err {
+  margin: 0 0 22rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 16rpx;
+  background: #FDECEA;
+  color: var(--tag-severe);
+  font-size: 24rpx;
+  line-height: 1.55;
+}
+
+.submit {
+  margin-top: 8rpx;
+  height: 92rpx;
+  font-size: 31rpx;
+  letter-spacing: 4rpx;
+}
+
+.hint {
+  margin-top: 22rpx;
+  font-size: 22rpx;
+  color: var(--text-3);
+  text-align: center;
+}
+
+.foot-tip {
+  margin-top: 40rpx;
+  text-align: center;
+  font-size: 22rpx;
+  color: var(--text-3);
+}

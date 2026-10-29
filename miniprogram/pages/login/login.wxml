@@ -1,0 +1,71 @@
+<view class="login-page">
+  <view class="brand">
+    <view class="brand-logo">玉</view>
+    <view class="brand-title">玉米病害智能诊断</view>
+    <view class="brand-sub">登录后即可使用识别 · 飞防 · AI 问答</view>
+  </view>
+
+  <view class="card form-card">
+    <view class="tabs">
+      <view class="tab {{mode === 'login' ? 'active' : ''}}" data-mode="login" bindtap="switchMode">登录</view>
+      <view class="tab {{mode === 'register' ? 'active' : ''}}" data-mode="register" bindtap="switchMode">注册</view>
+    </view>
+
+    <view class="field">
+      <text class="label">账号</text>
+      <input
+        class="input"
+        value="{{username}}"
+        data-key="username"
+        bindinput="onInput"
+        placeholder="字母开头，3-32 位"
+        placeholder-class="ph"
+      />
+    </view>
+
+    <view wx:if="{{mode === 'register'}}" class="field">
+      <text class="label">昵称</text>
+      <input
+        class="input"
+        value="{{displayName}}"
+        data-key="displayName"
+        bindinput="onInput"
+        placeholder="选填，默认与账号一致"
+        placeholder-class="ph"
+      />
+    </view>
+
+    <view class="field">
+      <text class="label">密码</text>
+      <input
+        class="input"
+        password
+        value="{{password}}"
+        data-key="password"
+        bindinput="onInput"
+        placeholder="{{mode === 'register' ? '至少 8 位，且含字母与数字' : '请输入密码'}}"
+        placeholder-class="ph"
+      />
+    </view>
+
+    <view wx:if="{{mode === 'login'}}" class="row-between">
+      <view class="remember" bindtap="toggleRemember">
+        <view class="checkbox {{remember ? 'on' : ''}}">
+          <text wx:if="{{remember}}">✓</text>
+        </view>
+        <text class="remember-text">记住登录（7 天）</text>
+      </view>
+      <text class="demo-link" bindtap="useDemo">填入演示账号</text>
+    </view>
+
+    <view wx:if="{{error}}" class="err">{{error}}</view>
+
+    <button class="btn-primary submit" bindtap="submit" loading="{{loading}}" disabled="{{loading}}">
+      {{mode === 'login' ? '登 录' : '注 册'}}
+    </button>
+
+    <view wx:if="{{mode === 'register' && !allowRegister}}" class="hint">管理员已关闭注册，请使用演示账号登录</view>
+  </view>
+
+  <view class="foot-tip">体验账号：admin / corn@2026</view>
+</view>
