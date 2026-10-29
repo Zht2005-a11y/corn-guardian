@@ -376,15 +376,6 @@ def extract_token(request: Request) -> str:
 
 PUBLIC_PATHS = {"/", "/health", "/favicon.ico", "/docs", "/redoc", "/openapi.json"}
 
-# 微信小程序端目前没有登录入口，体验阶段默认放开大屏业务接口（/screen/*）的匿名访问；
-# 需要恢复「必须登录」时，在部署环境设置 AUTH_REQUIRE_SCREEN=1 即可。
-_REQUIRE_SCREEN_TOKEN = os.getenv("AUTH_REQUIRE_SCREEN", "0").strip().lower() in {
-    "1",
-    "true",
-    "yes",
-    "on",
-}
-
 
 def is_public(path: str) -> bool:
     if path in PUBLIC_PATHS:
@@ -392,12 +383,7 @@ def is_public(path: str) -> bool:
     if path.startswith("/auth/"):
         return True
     # Swagger UI 的静态资源
-    if path.startswith("/docs/"):
-        return True
-    # 体验期放行大屏业务接口（小程序无登录态）
-    if not _REQUIRE_SCREEN_TOKEN and path.startswith("/screen/"):
-        return True
-    return False
+    return path.startswith("/docs/")
 
 
 def check_request(request: Request) -> Optional[Tuple[int, Dict[str, Any]]]:
