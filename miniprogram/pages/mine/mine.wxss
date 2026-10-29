@@ -1,4 +1,14 @@
 .profile-card { display: flex; align-items: center; gap: 24rpx; }
+.p-info { flex: 1; min-width: 0; }
+.p-action {
+  flex: none;
+  padding: 10rpx 26rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #0BA77B;
+  border: 2rpx solid rgba(11, 167, 123, 0.35);
+  line-height: 1.3;
+}
 .avatar {
   width: 110rpx; height: 110rpx;
   border-radius: 50%;

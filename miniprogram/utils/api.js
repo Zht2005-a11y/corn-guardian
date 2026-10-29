@@ -48,7 +48,22 @@ function authHeader() {
   }
 }
 
-function request(path, method, data) {
+function buildHttpError(res, body, cost, rid, url) {
+  const detail = (body && (body.detail || body.message)) || ('HTTP ' + res.statusCode);
+  let suffix = '（HTTP ' + res.statusCode + ' · ' + cost + 'ms' + (rid ? ' · ' + rid : '') + '）';
+  if (res.statusCode === 401) {
+    suffix = '（登录态失效，已尝试自动重新登录 · ' + cost + 'ms）';
+  } else if (res.statusCode === 200 && typeof body === 'string') {
+    suffix = '（返回的是 HTML 而不是 JSON，通常说明 nginx 没把接口反代到后端）';
+  }
+  const err = new Error(detail + suffix);
+  err.statusCode = res.statusCode;
+  err.body = body;
+  err.url = url;
+  return err;
+}
+
+function request(path, method, data, retried) {
   const url = buildUrl(path);
   const verb = method || 'GET';
   const t0 = Date.now();
@@ -72,17 +87,16 @@ function request(path, method, data) {
           resolve(body.data);
           return;
         }
-        const detail = (body && (body.detail || body.message)) || ('HTTP ' + res.statusCode);
-        let suffix = '（HTTP ' + res.statusCode + ' · ' + cost + 'ms' + (rid ? ' · ' + rid : '') + '）';
-        if (res.statusCode === 401) {
-          suffix = '（后端要求登录令牌，请在「我的」页登录后重试 · ' + cost + 'ms）';
-        } else if (res.statusCode === 200 && typeof body === 'string') {
-          suffix = '（返回的是 HTML 而不是 JSON，通常说明 nginx 没把接口反代到后端）';
+        const err = buildHttpError(res, body, cost, rid, url);
+        // 401：令牌缺失或过期时，用内置测试账号静默重登并重试一次（/auth/* 自身不重试，避免死循环）
+        if (res.statusCode === 401 && !retried && path.indexOf('/auth/') !== 0) {
+          const auth = require('./auth');
+          auth.relogin()
+            .then(() => request(path, method, data, true))
+            .then(resolve)
+            .catch(() => reject(err));
+          return;
         }
-        const err = new Error(detail + suffix);
-        err.statusCode = res.statusCode;
-        err.body = body;
-        err.url = url;
         reject(err);
       },
       fail(err) {
@@ -191,6 +205,23 @@ const api = {
   sessionList: (limit) => request('/screen/sessions?limit=' + (limit || 30)),
   sessionDetail: (sid) => request('/screen/sessions/' + sid),
   sessionDelete: (sid) => request('/screen/sessions/' + sid, 'DELETE'),
+
+  /** 账号认证（后端 /auth/*，登录成功返回 {token, user, expires_in}） */
+  login: (username, password, remember) =>
+    request('/auth/login', 'POST', {
+      username: username,
+      password: password,
+      remember: !!remember
+    }),
+  register: (username, password, displayName) =>
+    request('/auth/register', 'POST', {
+      username: username,
+      password: password,
+      display_name: displayName || username
+    }),
+  me: () => request('/auth/me'),
+  logout: () => request('/auth/logout', 'POST', {}),
+  authConfig: () => request('/auth/config'),
 
   compressToDataUrl,
   fileToDataUrl,
