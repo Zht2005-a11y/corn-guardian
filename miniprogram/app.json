@@ -1,0 +1,34 @@
+{
+  "pages": [
+    "pages/home/home",
+    "pages/identify/identify",
+    "pages/assistant/assistant",
+    "pages/mine/mine",
+    "pages/result/result",
+    "pages/spray/spray",
+    "pages/monitor/monitor",
+    "pages/history/history"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#F2F8F8",
+    "navigationBarTextStyle": "black",
+    "navigationBarTitleText": "玉米病害智能诊断",
+    "backgroundColor": "#F2F8F8",
+    "backgroundTextStyle": "dark"
+  },
+  "tabBar": {
+    "custom": true,
+    "color": "#8C999C",
+    "selectedColor": "#0BA77B",
+    "backgroundColor": "#FFFFFF",
+    "list": [
+      { "pagePath": "pages/home/home", "text": "首页" },
+      { "pagePath": "pages/identify/identify", "text": "识别" },
+      { "pagePath": "pages/assistant/assistant", "text": "问答" },
+      { "pagePath": "pages/mine/mine", "text": "我的" }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

@@ -1,0 +1,118 @@
+<view class="page-body">
+  <!-- 识别模式切换 -->
+  <scroll-view scroll-x class="mode-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="pill-tabs scroll">
+      <view
+        wx:for="{{modes}}"
+        wx:key="key"
+        class="pill {{mode === item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="switchMode"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- 单张 / 多模型 / Base64：单图上传 -->
+  <view wx:if="{{mode !== 'batch'}}" class="card upload-card" bindtap="chooseImage">
+    <block wx:if="{{!imagePath}}">
+      <image class="upload-icon" src="{{icons.camera}}" mode="aspectFit" />
+      <view class="upload-text">点击上传玉米叶片图片</view>
+      <view class="upload-sub">支持 JPG / PNG / BMP 等格式</view>
+    </block>
+    <block wx:else>
+      <image class="preview-img" src="{{imagePath}}" mode="aspectFit" />
+      <view class="preview-actions">
+        <view class="mini-btn" catchtap="chooseImage">重新选择</view>
+        <view class="mini-btn danger" catchtap="clearImage">删除</view>
+      </view>
+    </block>
+  </view>
+
+  <!-- 多模型对比：模型选择 -->
+  <view wx:if="{{mode === 'compare'}}" class="card">
+    <view class="card-title">对比维度</view>
+    <view class="cmp-note">识别完成后展示 ResNet50-CBAM 模型对全部 4 类病害的置信度分布对比，以及模型耗时，用于横向评估。</view>
+  </view>
+
+  <!-- Base64 输入 -->
+  <view wx:if="{{mode === 'base64'}}" class="card">
+    <view class="card-title">图片 Base64</view>
+    <textarea
+      class="b64-input"
+      value="{{base64Text}}"
+      placeholder="粘贴 data:image/... 或纯 base64 字符串"
+      bindinput="onBase64Input"
+      maxlength="-1"
+    />
+  </view>
+
+  <!-- 批量识别：多图上传 -->
+  <view wx:if="{{mode === 'batch'}}">
+    <view class="card upload-card" bindtap="chooseBatch">
+      <block wx:if="{{batchList.length === 0}}">
+        <image class="upload-icon" src="{{icons.photo}}" mode="aspectFit" />
+        <view class="upload-text">选择多张叶片图片（最多9张）</view>
+        <view class="upload-sub">批量巡田 · 自动汇总病害分布</view>
+      </block>
+      <block wx:else>
+        <view class="batch-head">
+          <text>已选 {{batchList.length}} 张</text>
+          <text class="mini-btn danger" catchtap="clearBatch">清空</text>
+        </view>
+        <view class="batch-grid">
+          <view wx:for="{{batchList}}" wx:key="*this" class="batch-cell">
+            <image src="{{item}}" mode="aspectFill" />
+          </view>
+        </view>
+      </block>
+    </view>
+
+    <!-- 批量结果汇总 -->
+    <view wx:if="{{batchSummary}}" class="card">
+      <view class="card-title">批量巡田汇总 <text class="demo-mark">真实推理结果</text></view>
+      <view class="sum-row">
+        <view class="sum-item"><text class="v">{{batchSummary.success}}</text><text class="k">成功</text></view>
+        <view class="sum-item"><text class="v">{{batchSummary.avgDamageRate}}%</text><text class="k">平均受损率</text></view>
+        <view class="sum-item"><text class="v">{{batchSummary.avgConfidence}}%</text><text class="k">平均置信度</text></view>
+        <view class="sum-item"><text class="v">{{batchSummary.totalVolumeLiters}}L</text><text class="k">建议总药液</text></view>
+      </view>
+      <view class="hr"></view>
+      <view class="dist-row">
+        <view wx:for="{{batchSummary.byClass}}" wx:key="class_en" class="dist-item">
+          <view class="dot" style="background: {{item.color}};"></view>
+          <text>{{item.name}} × {{item.count}}</text>
+        </view>
+      </view>
+      <view wx:if="{{batchItems.length}}" class="batch-items">
+        <view wx:for="{{batchItems}}" wx:key="index" class="batch-item">
+          <text class="bi-name">#{{item.index + 1}} {{item.class_name_cn}}</text>
+          <text class="tag {{item.tagCls}}">{{item.tagText}}</text>
+          <text class="bi-rate">受损 {{item.damageRate}}%</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 识别示例 -->
+  <view class="card">
+    <view class="card-title">识别示例 <text class="demo-mark">示例图片 · Wikimedia Commons</text></view>
+    <view class="example-row">
+      <view
+        wx:for="{{examples}}"
+        wx:key="name"
+        class="example-item"
+        data-path="{{item.img}}"
+        bindtap="useExample"
+      >
+        <image src="{{item.img}}" mode="aspectFill" />
+        <text>{{item.name}}</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 底部按钮 -->
+  <button class="btn-primary bottom-btn" loading="{{loading}}" disabled="{{loading}}" bindtap="onAction">
+    {{actionText}}
+  </button>
+  <view wx:if="{{mode === 'single' && !imagePath}}" class="bottom-hint">请先选择或拍摄玉米叶片图片</view>
+</view>

@@ -1,0 +1,53 @@
+<view class="page-body">
+  <!-- 分类筛选 -->
+  <scroll-view scroll-x class="filter-scroll" enhanced show-scrollbar="{{false}}">
+    <view class="filter-row">
+      <view
+        wx:for="{{filters}}"
+        wx:key="key"
+        class="filter-chip {{filter === item.key ? 'active' : ''}}"
+        data-key="{{item.key}}"
+        bindtap="switchFilter"
+      >{{item.label}}</view>
+    </view>
+  </scroll-view>
+
+  <!-- 历史记录列表 -->
+  <view
+    wx:for="{{showList}}"
+    wx:key="id"
+    class="card history-card"
+    data-id="{{item.id}}"
+    bindtap="openDetail"
+  >
+    <image class="h-thumb" src="{{item.thumb_small}}" mode="aspectFill" />
+    <view class="h-info">
+      <view class="h-name">
+        <text>{{item.class_name}}</text>
+        <view class="tag {{item.tagCls}}">{{item.tagText}}</view>
+      </view>
+      <view class="h-meta">{{item.created_at}}</view>
+      <view class="h-meta">受损率 <text class="h-rate">{{item.damage_rate}}%</text> · 置信度 {{item.confidence}}%</view>
+    </view>
+    <view class="h-actions">
+      <image class="h-arrow" src="{{icons.arrow}}" mode="aspectFit" />
+      <image class="h-del" src="{{icons.trash}}" mode="aspectFit" data-id="{{item.id}}" catchtap="removeItem" />
+    </view>
+  </view>
+
+  <!-- 空状态 -->
+  <view wx:if="{{!showList.length && !loading}}" class="card empty-card">
+    <image class="empty-icon" src="{{icons.leaf}}" mode="aspectFit" />
+    <view class="center-tip">暂无识别记录</view>
+    <button class="btn-ghost empty-btn" bindtap="goIdentify">开始识别</button>
+  </view>
+
+  <view wx:if="{{hasMore && showList.length}}" class="load-more" bindtap="loadMore">
+    加载更多
+  </view>
+  <view wx:if="{{!hasMore && showList.length}}" class="center-tip">没有更多了</view>
+
+  <view class="clear-row" wx:if="{{showList.length}}">
+    <text class="clear-btn" bindtap="clearAll">清空历史记录</text>
+  </view>
+</view>

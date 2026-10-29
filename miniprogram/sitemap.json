@@ -1,0 +1,9 @@
+{
+  "desc": "玉米病害诊断小程序",
+  "rules": [
+    {
+      "action": "disallow",
+      "page": "*"
+    }
+  ]
+}

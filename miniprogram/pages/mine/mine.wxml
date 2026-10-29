@@ -1,0 +1,50 @@
+<view class="page-body">
+  <!-- 用户卡 -->
+  <view class="card profile-card">
+    <view class="avatar">{{initial}}</view>
+    <view class="p-info">
+      <view class="p-name">种植户用户</view>
+      <view class="p-sub">玉米叶部病斑多尺度感知系统</view>
+    </view>
+  </view>
+
+  <!-- 统计 -->
+  <view class="card">
+    <view class="card-title">诊断统计</view>
+    <view class="stat-row">
+      <view class="stat-item">
+        <text class="v">{{stats.total}}</text>
+        <text class="k">累计识别</text>
+      </view>
+      <view class="stat-item">
+        <text class="v">{{stats.today}}</text>
+        <text class="k">今日识别</text>
+      </view>
+      <view class="stat-item">
+        <text class="v">{{online ? '在线' : '离线'}}</text>
+        <text class="k">服务状态</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 功能入口 -->
+  <view class="card menu-card">
+    <view class="menu-item" bindtap="goMonitor">
+      <image src="{{icons.chart}}" mode="aspectFit" />
+      <text>田间监测</text>
+      <image class="arrow" src="{{icons.arrow}}" mode="aspectFit" />
+    </view>
+    <view class="menu-item" bindtap="goHistory">
+      <image src="{{icons.history}}" mode="aspectFit" />
+      <text>识别历史</text>
+      <image class="arrow" src="{{icons.arrow}}" mode="aspectFit" />
+    </view>
+    <view class="menu-item" bindtap="showApi">
+      <image src="{{icons.model}}" mode="aspectFit" />
+      <text>后端服务地址</text>
+      <text class="menu-val">{{apiBase}}</text>
+    </view>
+  </view>
+
+  <view class="about">玉米叶部病害智能诊断与无人机飞防决策系统 · 小程序端 v1.0<br />模型：ResNet50-CBAM + Grad-CAM</view>
+</view>

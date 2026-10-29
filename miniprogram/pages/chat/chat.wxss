@@ -1,0 +1,12 @@
+/* AI 问答样式已迁移至 pages/assistant/assistant.wxss，本文件为兼容占位 */
+.chat-redirect {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100vh;
+  background: #F2F8F8;
+}
+.cr-tip {
+  font-size: 26rpx;
+  color: #8C999C;
+}

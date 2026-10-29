@@ -1,0 +1,56 @@
+.pill-tabs { margin-bottom: 22rpx; }
+.chart-card { min-height: 500rpx; }
+.data-mark {
+  font-size: 20rpx;
+  color: #8C999C;
+  margin-top: 6rpx;
+}
+.chart-canvas {
+  width: 100%;
+  height: 420rpx;
+  margin-top: 20rpx;
+}
+.chart-canvas.big { height: 520rpx; }
+
+.now-row {
+  display: flex;
+  justify-content: space-around;
+  margin-top: 18rpx;
+}
+.now-item {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  font-size: 28rpx;
+  color: #202B2D;
+  font-weight: 500;
+}
+.now-item image { width: 34rpx; height: 34rpx; }
+
+/* 分布占比 */
+.dist-list { margin-top: 16rpx; }
+.dist-line {
+  display: flex;
+  align-items: center;
+  gap: 12rpx;
+  padding: 10rpx 0;
+  font-size: 24rpx;
+}
+.dist-line .dot { width: 16rpx; height: 16rpx; border-radius: 6rpx; flex-shrink: 0; }
+.dn { width: 170rpx; color: #4F5B5E; }
+.db-bg { flex: 1; height: 14rpx; background: #EAF1F1; border-radius: 999rpx; overflow: hidden; }
+.db { height: 100%; border-radius: 999rpx; }
+.dv { width: 90rpx; text-align: right; color: #4F5B5E; }
+
+/* 雷达指标 */
+.radar-list { margin-top: 20rpx; }
+.radar-line {
+  display: flex;
+  justify-content: space-between;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #E9EFF0;
+  font-size: 25rpx;
+}
+.radar-line:last-child { border-bottom: none; }
+.rn { color: #4F5B5E; }
+.rv { color: #0BA77B; font-weight: 600; }

@@ -1,0 +1,183 @@
+/* 首页沉浸式主视觉 */
+.home {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #EAF5F5 0%, #F2F8F8 40%);
+}
+.hero {
+  position: relative;
+  height: 46vh;
+  min-height: 560rpx;
+}
+.hero-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.hero-mask {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(15, 60, 90, 0.38) 0%, rgba(15, 60, 90, 0.05) 40%, rgba(242, 248, 248, 0.92) 100%);
+}
+.hero-drone {
+  position: absolute;
+  top: 120rpx;
+  right: 40rpx;
+  width: 88rpx;
+  height: 88rpx;
+  opacity: 0.95;
+  filter: drop-shadow(0 4rpx 8rpx rgba(0, 0, 0, 0.25));
+}
+.hero-top {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  padding: 16rpx 32rpx;
+}
+.loc-pill {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255, 255, 255, 0.28);
+  backdrop-filter: blur(12px);
+  border-radius: 999rpx;
+  padding: 8rpx 22rpx;
+  color: #fff;
+  font-size: 22rpx;
+}
+.loc-icon { width: 26rpx; height: 26rpx; margin-right: 8rpx; }
+.hero-title-wrap {
+  position: absolute;
+  left: 36rpx;
+  right: 36rpx;
+  top: 26%;
+}
+.hero-title {
+  color: #fff;
+  font-size: 42rpx;
+  font-weight: 700;
+  line-height: 1.45;
+  text-shadow: 0 2rpx 12rpx rgba(0, 40, 60, 0.35);
+  white-space: pre-line;
+}
+.hero-sub {
+  margin-top: 14rpx;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 24rpx;
+  letter-spacing: 2rpx;
+}
+
+/* 功能宫格 */
+.home-body { margin-top: -40rpx; position: relative; }
+.func-grid {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+.func-card {
+  width: 48.4%;
+  margin-bottom: 0;
+  padding: 26rpx;
+}
+/* 四张功能卡：各配一档柔和功能色渐变（左上角着色 → 右下回白） */
+.func-card--green {
+  background: linear-gradient(160deg, #E3F5EF 0%, #F2FAF7 40%, #FFFFFF 78%);
+  border-color: rgba(11, 167, 123, 0.16);
+  box-shadow: 0 8rpx 24rpx rgba(11, 167, 123, 0.10);
+}
+.func-card--blue {
+  background: linear-gradient(160deg, #E7F3FF 0%, #F2F8FF 40%, #FFFFFF 78%);
+  border-color: rgba(46, 124, 230, 0.16);
+  box-shadow: 0 8rpx 24rpx rgba(46, 124, 230, 0.10);
+}
+.func-card--purple {
+  background: linear-gradient(160deg, #F0EAFE 0%, #F7F3FF 40%, #FFFFFF 78%);
+  border-color: rgba(142, 107, 241, 0.16);
+  box-shadow: 0 8rpx 24rpx rgba(142, 107, 241, 0.10);
+}
+.func-card--orange {
+  background: linear-gradient(160deg, #FFF0E6 0%, #FFF6EF 40%, #FFFFFF 78%);
+  border-color: rgba(255, 152, 79, 0.18);
+  box-shadow: 0 8rpx 24rpx rgba(255, 152, 79, 0.12);
+}
+/* 图标底座：白色玻璃底 + 同色柔和投影，浮在渐变卡上 */
+.func-icon.chip-green {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4rpx 14rpx rgba(11, 167, 123, 0.22);
+}
+.func-icon.chip-blue {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4rpx 14rpx rgba(46, 124, 230, 0.22);
+}
+.func-icon.chip-purple {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4rpx 14rpx rgba(142, 107, 241, 0.22);
+}
+.func-icon.chip-orange {
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 4rpx 14rpx rgba(255, 152, 79, 0.24);
+}
+.func-icon {
+  width: 76rpx;
+  height: 76rpx;
+  border-radius: 22rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.func-icon image { width: 44rpx; height: 44rpx; }
+.func-name {
+  margin-top: 18rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #202B2D;
+}
+.func-name .pro {
+  font-size: 20rpx;
+  color: #0BA77B;
+  margin-left: 6rpx;
+  font-weight: 500;
+}
+.func-desc {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #8C999C;
+}
+
+/* 天气卡片 */
+.weather-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.weather-left { display: flex; align-items: center; }
+.weather-icon { width: 68rpx; height: 68rpx; }
+.weather-temp { margin-left: 20rpx; }
+.weather-temp .t { font-size: 44rpx; font-weight: 600; color: #202B2D; }
+.weather-temp .desc { font-size: 24rpx; color: #8C999C; margin-left: 10rpx; }
+.weather-right { display: flex; flex-direction: column; gap: 8rpx; }
+.w-item {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  font-size: 24rpx;
+  color: #4F5B5E;
+}
+.w-item image { width: 30rpx; height: 30rpx; margin-right: 8rpx; }
+
+/* 最近识别 */
+.recent-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.recent-more { font-size: 24rpx; color: #8C999C; }
+.recent-row { display: flex; align-items: center; margin-top: 20rpx; }
+.recent-thumb {
+  width: 96rpx;
+  height: 96rpx;
+  border-radius: 16rpx;
+  background: #F4F4F4;
+}
+.recent-info { margin-left: 20rpx; }
+.recent-name { font-size: 28rpx; font-weight: 500; display: flex; align-items: center; gap: 12rpx; }
+.recent-meta { font-size: 22rpx; color: #8C999C; margin-top: 6rpx; }

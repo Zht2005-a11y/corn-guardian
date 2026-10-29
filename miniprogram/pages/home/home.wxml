@@ -1,0 +1,100 @@
+<view class="home">
+  <!-- 顶部主视觉 -->
+  <view class="hero" style="padding-top: {{statusBarHeight}}px;">
+    <image class="hero-img" src="/assets/images/hero.jpg" mode="aspectFill" />
+    <view class="hero-mask"></view>
+
+    <!-- 无人机点缀图标 -->
+    <image class="hero-drone" src="{{icons.drone}}" mode="aspectFit" />
+
+    <view class="hero-top">
+      <view class="loc-pill">
+        <image class="loc-icon" src="{{icons.location}}" mode="aspectFit" />
+        <text>示范田块 · 河南周口</text>
+      </view>
+    </view>
+
+    <view class="hero-title-wrap">
+      <view class="hero-title">玉米叶部病害智能诊断\n与无人机飞防决策系统</view>
+      <view class="hero-sub">AI 识别 · 精准施药 · 科学植保</view>
+    </view>
+  </view>
+
+  <view class="page-body home-body">
+    <!-- 四大功能入口 -->
+    <view class="func-grid">
+      <view class="func-card card func-card--green" data-url="/pages/identify/identify" bindtap="go">
+        <view class="func-icon chip-green">
+          <image src="{{icons.leaf}}" mode="aspectFit" />
+        </view>
+        <view class="func-name">病害识别<text class="pro">β</text></view>
+        <view class="func-desc">上传叶片 · AI 智能识别</view>
+      </view>
+
+      <view class="func-card card func-card--blue" data-url="/pages/spray/spray" bindtap="go">
+        <view class="func-icon chip-blue">
+          <image src="{{icons.droneBlue}}" mode="aspectFit" />
+        </view>
+        <view class="func-name">飞防决策</view>
+        <view class="func-desc">生成田间处方</view>
+      </view>
+
+      <view class="func-card card func-card--purple" data-url="/pages/assistant/assistant" bindtap="go">
+        <view class="func-icon chip-purple">
+          <image src="{{icons.robot}}" mode="aspectFit" />
+        </view>
+        <view class="func-name">AI 问答<text class="pro">β</text></view>
+        <view class="func-desc">植保专家 · 在线解答</view>
+      </view>
+
+      <view class="func-card card func-card--orange" data-url="/pages/history/history" bindtap="go">
+        <view class="func-icon chip-orange">
+          <image src="{{icons.history}}" mode="aspectFit" />
+        </view>
+        <view class="func-name">识别历史</view>
+        <view class="func-desc">查看历史记录</view>
+      </view>
+    </view>
+
+    <!-- 天气卡片 -->
+    <view class="card weather-card" bindtap="goMonitor" style="height: 137rpx; display: flex; box-sizing: border-box">
+      <block wx:if="{{weather.temp !== ''}}">
+        <view class="weather-left">
+          <image class="weather-icon" src="{{icons.sun}}" mode="aspectFit" />
+          <view class="weather-temp">
+            <text class="t">{{weather.temp}}</text>
+            <text class="desc">{{weather.desc}}</text>
+          </view>
+        </view>
+        <view class="weather-right">
+          <view class="w-item">
+            <image src="{{icons.humidity}}" mode="aspectFit" />
+            <text>湿度 {{weather.humidity}}%</text>
+          </view>
+          <view class="w-item">
+            <image src="{{icons.wind}}" mode="aspectFit" />
+            <text>风速 {{weather.wind}}m/s</text>
+          </view>
+        </view>
+      </block>
+      <view wx:else class="center-tip">
+        <text class="loading-dot"></text>正在获取田间气象…
+      </view>
+    </view>
+
+    <!-- 最近识别任务摘要（有真实记录才显示） -->
+    <view wx:if="{{recent}}" class="card recent-card" bindtap="goHistory">
+      <view class="recent-head">
+        <text class="card-title">最近识别</text>
+        <text class="recent-more">全部 ›</text>
+      </view>
+      <view class="recent-row">
+        <image class="recent-thumb" src="{{recent.thumb_small}}" mode="aspectFill" />
+        <view class="recent-info">
+          <view class="recent-name">{{recent.class_name}} <text class="tag {{recent.tagCls}}">{{recent.tagText}}</text></view>
+          <view class="recent-meta">{{recent.created_at}} · 受损率 {{recent.damage_rate}}%</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</view>

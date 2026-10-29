@@ -1,0 +1,61 @@
+<view class="page-body">
+  <!-- 标签切换 -->
+  <view class="pill-tabs">
+    <view class="pill {{tab === 'climate' ? 'active' : ''}}" data-key="climate" bindtap="switchTab">微气候</view>
+    <view class="pill {{tab === 'disease' ? 'active' : ''}}" data-key="disease" bindtap="switchTab">病害统计</view>
+    <view class="pill {{tab === 'radar' ? 'active' : ''}}" data-key="radar" bindtap="switchTab">抗逆评估</view>
+  </view>
+
+  <!-- 微气候 -->
+  <view wx:if="{{tab === 'climate'}}" class="card chart-card">
+    <view class="card-title">24小时微气候时序</view>
+    <view class="data-mark">{{dataMark}}</view>
+    <view wx:if="{{current}}" class="now-row">
+      <view class="now-item">
+        <image src="{{icons.temp}}" mode="aspectFit" />
+        <text>{{current.temp}}℃</text>
+      </view>
+      <view class="now-item">
+        <image src="{{icons.humidity}}" mode="aspectFit" />
+        <text>{{current.humidity}}%</text>
+      </view>
+      <view class="now-item">
+        <image src="{{icons.sun}}" mode="aspectFit" />
+        <text>{{current.light}}kLux</text>
+      </view>
+    </view>
+    <canvas type="2d" id="lineChart" class="chart-canvas tall"></canvas>
+  </view>
+
+  <!-- 病害统计 -->
+  <view wx:if="{{tab === 'disease'}}" class="card chart-card">
+    <view class="card-title">病害发生频次</view>
+    <view class="data-mark">{{barMark}}</view>
+    <canvas type="2d" id="barChart" class="chart-canvas tall"></canvas>
+    <view class="hr"></view>
+    <view class="card-title">当前病害分布占比</view>
+    <view class="dist-list">
+      <view wx:for="{{distribution}}" wx:key="name" class="dist-line">
+        <view class="dot" style="background: {{item.color}};"></view>
+        <text class="dn">{{item.name}}</text>
+        <view class="db-bg">
+          <view class="db" style="width: {{item.value}}%; background: {{item.color}};"></view>
+        </view>
+        <text class="dv">{{item.value}}%</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- 抗逆评估 -->
+  <view wx:if="{{tab === 'radar'}}" class="card chart-card">
+    <view class="card-title">六维抗逆感知评估</view>
+    <view class="data-mark">{{dataMark}}</view>
+    <canvas type="2d" id="radarChart" class="chart-canvas big"></canvas>
+    <view class="radar-list">
+      <view wx:for="{{radar}}" wx:key="name" class="radar-line">
+        <text class="rn">{{item.name}}</text>
+        <text class="rv">{{item.value}}</text>
+      </view>
+    </view>
+  </view>
+</view>
