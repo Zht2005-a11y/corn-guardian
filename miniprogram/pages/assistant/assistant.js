@@ -520,7 +520,7 @@ Page({
     };
 
     this.task = wx.request({
-      url: api.BASE_URL + '/screen/chat/stream',
+      url: api.buildUrl ? api.buildUrl('/screen/chat/stream') : (api.BASE_URL + '/screen/chat/stream'),
       method: 'POST',
       data: {
         message: message,
@@ -536,7 +536,13 @@ Page({
         if (err && err.errMsg && err.errMsg.indexOf('abort') >= 0) {
           finish('已停止生成');
         } else {
-          finish('连接失败：' + ((err && err.errMsg) || '') + '（请确认后端已启动）');
+          if (api.notifyDebugGuidanceIfNeeded) api.notifyDebugGuidanceIfNeeded();
+          const msg = (err && err.errMsg) || '';
+          let hint = '';
+          if (msg.indexOf('url not in domain list') >= 0 || msg.indexOf('CLEARTEXT') >= 0) {
+            hint = '（体验版请在右上角菜单开启「开发调试」）';
+          }
+          finish('连接失败：' + msg + hint);
         }
       }
     });
