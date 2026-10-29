@@ -2862,41 +2862,7 @@ onUnmounted(() => {
   }
 }
 
-/* 底部品牌块：植物 + slogan（点击进入个人中心） */
-.brand-tile {
-  width: 84px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 14px 6px 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 9px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-
-  .plant-icon {
-    width: 26px;
-    height: 26px;
-  }
-
-  .brand-tile-text {
-    font-size: 10px;
-    line-height: 1.7;
-    color: #7d938a;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-
-    .brand-tile-text {
-      color: #a7bcb1;
-    }
-  }
-}
+/* 底部品牌块样式已删除：入口按钮换成纯展示的 .brand-sticker（见上） */
 
 /* ════════════════════ 2. BODY (1091px) ════════════════════ */
 .tanee-body {
