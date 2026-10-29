@@ -48,7 +48,7 @@ Page({
         });
       })
       .catch(() => {
-        this.setData({ weather: { temp: '', desc: '未连接', humidity: '--', wind: '--' } });
+        this.setData({ weather: { temp: '', desc: '', humidity: '', wind: '', failed: true } });
       });
   },
 

@@ -67,7 +67,7 @@
 }
 
 /* 功能宫格 */
-.home-body { margin-top: -40rpx; position: relative; }
+.home-body { margin-top: 28rpx; position: relative; }
 .func-grid {
   display: flex;
   flex-wrap: wrap;
@@ -143,26 +143,54 @@
   color: #8C999C;
 }
 
-/* 天气卡片 */
-.weather-card {
+/* 主视觉内置的田间气象浮层（玻璃质感，压在主视觉底部） */
+.hero-weather {
+  position: absolute;
+  left: 32rpx;
+  right: 32rpx;
+  bottom: 52rpx;
+  min-height: 118rpx;
+  padding: 18rpx 28rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  border-radius: 26rpx;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(238, 249, 245, 0.9));
+  backdrop-filter: blur(16px);
+  border: 1rpx solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 12rpx 32rpx rgba(15, 60, 90, 0.14);
+}
+.hw-main { display: flex; align-items: center; }
+.hw-icon { width: 60rpx; height: 60rpx; }
+.hw-temp-wrap { margin-left: 16rpx; display: flex; align-items: baseline; }
+.hw-temp { font-size: 42rpx; font-weight: 600; color: #202B2D; }
+.hw-desc { font-size: 22rpx; color: #4F5B5E; margin-left: 10rpx; }
+.hw-split {
+  width: 1rpx;
+  height: 56rpx;
+  margin: 0 24rpx;
+  background: rgba(141, 153, 156, 0.3);
+}
+.hw-metrics {
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: space-between;
 }
-.weather-left { display: flex; align-items: center; }
-.weather-icon { width: 68rpx; height: 68rpx; }
-.weather-temp { margin-left: 20rpx; }
-.weather-temp .t { font-size: 44rpx; font-weight: 600; color: #202B2D; }
-.weather-temp .desc { font-size: 24rpx; color: #8C999C; margin-left: 10rpx; }
-.weather-right { display: flex; flex-direction: column; gap: 8rpx; }
-.w-item {
+.hw-item {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
+  font-size: 23rpx;
+  color: #3F4B4E;
+}
+.hw-item image { width: 30rpx; height: 30rpx; margin-right: 8rpx; }
+.hw-loading {
+  display: flex;
+  align-items: center;
+  margin: 0 auto;
   font-size: 24rpx;
   color: #4F5B5E;
 }
-.w-item image { width: 30rpx; height: 30rpx; margin-right: 8rpx; }
 
 /* 最近识别 */
 .recent-head {
