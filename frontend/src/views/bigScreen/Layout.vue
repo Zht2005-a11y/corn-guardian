@@ -101,14 +101,16 @@
               <div v-if="themeMenuOpen" class="theme-popover-mask" @click="themeMenuOpen = false"></div>
             </div>
 
-            <button class="brand-tile" @click="activeModal = 'profile'" title="个人中心">
-              <svg class="plant-icon" viewBox="0 0 24 24" fill="none" stroke="#7fa08d" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M12 21V11"/>
-                <path d="M12 11C12 7.5 9.5 5 6 5C6 8.5 8.5 11 12 11Z" fill="#5f8a72" stroke="none"/>
-                <path d="M12 13C12 10 14.2 8 17.5 8C17.5 11 15.3 13 12 13Z" fill="#4c7a5f" stroke="none"/>
+            <!-- 品牌标签（原「个人中心」入口已移除）：纯展示，不可点击、无 tooltip -->
+            <div class="brand-sticker" aria-hidden="true">
+              <svg class="sticker-leaf" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M12 21V12"/>
+                <path d="M12 13.5C12 10.2 9.4 7.5 6 7.5c0 3.3 2.6 6 6 6Z"/>
+                <path d="M12 15.5c0-3.3 2.6-6 6-6 0 3.3-2.6 6-6 6Z"/>
               </svg>
-              <span class="brand-tile-text">让农业更智能<br />让丰收更简单</span>
-            </button>
+              <span class="sticker-line">让农业更智能</span>
+              <span class="sticker-line">让丰收更简单</span>
+            </div>
           </div>
         </aside>
 
@@ -148,6 +150,51 @@
                     <path d="M4 6L8 10L12 6"/>
                   </svg>
                 </button>
+              </div>
+
+              <!-- 当前登录用户：头像点开显示账号信息 + 退出登录（认证状态见 stores/auth.js） -->
+              <div class="user-menu-wrap">
+                <button
+                  class="user-avatar-btn"
+                  :class="{ active: userMenuOpen }"
+                  @click.stop="userMenuOpen = !userMenuOpen"
+                  :title="`${auth.displayName}${auth.roleLabel ? ' · ' + auth.roleLabel : ''}`"
+                >
+                  <span class="avatar-initials">{{ auth.initials }}</span>
+                  <span class="avatar-presence"></span>
+                </button>
+
+                <transition name="pop-fade">
+                  <div v-if="userMenuOpen" class="user-popover">
+                    <div class="user-popover-head">
+                      <span class="user-popover-avatar">{{ auth.initials }}</span>
+                      <div class="user-popover-meta">
+                        <strong>{{ auth.displayName }}</strong>
+                        <span>{{ userMetaLine }}</span>
+                      </div>
+                    </div>
+
+                    <div class="user-popover-rows">
+                      <div class="user-popover-row">
+                        <span>账号</span>
+                        <b>{{ auth.user?.username || '--' }}</b>
+                      </div>
+                      <div class="user-popover-row">
+                        <span>上次登录</span>
+                        <b>{{ auth.user?.last_login_at || '首次登录' }}</b>
+                      </div>
+                    </div>
+
+                    <button class="user-logout-btn" @click="handleLogout">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                        <path d="M6.5 3H3.8A1.8 1.8 0 002 4.8v6.4A1.8 1.8 0 003.8 13h2.7" stroke-linecap="round"/>
+                        <path d="M10.5 5.5L13 8l-2.5 2.5M13 8H6.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <span>退出登录</span>
+                    </button>
+                  </div>
+                </transition>
+                <div v-if="userMenuOpen" class="user-popover-mask" @click="userMenuOpen = false"></div>
               </div>
             </div>
           </header>
@@ -1294,46 +1341,6 @@
     </div>
     </Transition>
 
-    <!-- Personal Center Modal（个人中心） -->
-    <div class="modal-backdrop-blur" v-if="activeModal === 'profile'" @click.self="activeModal = null">
-      <div class="tanee-modal-card profile-modal-card">
-        <div class="t-modal-head">
-          <div class="head-title-flex">
-            <img src="/tanee/svg/dashboard/icon-20.svg" alt="Profile" class="modal-head-icon"/>
-            <h4>个人中心</h4>
-          </div>
-          <button class="modal-close-btn" @click="activeModal = null">✕</button>
-        </div>
-        <div class="t-modal-body profile-body">
-          <div class="profile-id-card">
-            <div class="profile-avatar-circle">农</div>
-            <div class="profile-id-info">
-              <h3>植保管理员</h3>
-              <div class="profile-role-tags">
-                <span class="role-tag green">系统管理员</span>
-                <span class="role-tag gray">飞防调度员</span>
-              </div>
-              <p>玉米叶部病斑多尺度自适应感知与飞防决策系统</p>
-            </div>
-          </div>
-          <div class="profile-stats-grid">
-            <div class="profile-stat-cell"><strong>{{ historyStats ? historyStats.today : '—' }}</strong><span>今日诊断（次）</span></div>
-            <div class="profile-stat-cell"><strong>47</strong><span>累计任务（个）</span></div>
-            <div class="profile-stat-cell"><strong>8.6</strong><span>巡田里程（km）</span></div>
-          </div>
-          <div class="profile-info-rows">
-            <div class="profile-info-row"><span>登录账号</span><strong>admin@tanee.cn</strong></div>
-            <div class="profile-info-row"><span>所属单位</span><strong>智慧农业示范田 08 分区</strong></div>
-            <div class="profile-info-row"><span>上次登录</span><strong>今天 08:02 · 示范田边缘网关</strong></div>
-          </div>
-          <div class="profile-action-bar">
-            <button class="profile-secondary-btn">编辑资料</button>
-            <button class="profile-primary-btn">退出登录</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <!-- Drone Recommendation Modal（无人机推荐 · DJI 商城）
          完整复刻大疆商城风格的商品详情页：版本切换 / 价格同步 / 官方购买跳转 / 购物车 / 收藏
          弹窗特效：与病害图鉴同款 hero-video-dialog spring 编排（v-if 必须放在 Transition 内部才能触发进入/离开动画） -->
@@ -1345,6 +1352,7 @@
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
 import { Aim, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
@@ -1354,6 +1362,8 @@ import * as echarts from 'echarts'
 // 替代手写的字符级 fade 后处理（对齐 Vercel Streamdown / ChatGPT 的渐变吐字效果）
 import { Streamdown } from '@brucekit/streamdown-vue'
 import '@brucekit/streamdown-vue/styles.css'
+import { useAuthStore } from '@/stores/auth'
+import { authToken, redirectToLogin } from '@/utils/http'
 
 // ── Magic UI effects (shadcn registry · @magicui) ─────────────────────
 import MagicCard from '@/components/effects/magicui/MagicCard.vue'
@@ -1369,6 +1379,25 @@ const activeModal = ref(null)
 const showDiagWorkstation = ref(false)
 const scaleFactor = ref(1)
 const boardWidth = ref(1194)
+
+// ── 登录用户（令牌与用户信息由 stores/auth.js 管理）─────────────────────
+const router = useRouter()
+const auth = useAuthStore()
+const userMenuOpen = ref(false)
+
+// 显示名与角色同名时（如 admin 的「系统管理员」）副标题改显示账号，避免两行重复
+const userMetaLine = computed(() => {
+  const role = auth.roleLabel || ''
+  const name = auth.displayName || ''
+  if (!role || role === name) return auth.user?.username ? `@${auth.user.username}` : '已登录'
+  return role
+})
+
+async function handleLogout() {
+  userMenuOpen.value = false
+  await auth.logout()
+  router.replace({ path: '/login', query: { reason: '已退出登录' } })
+}
 
 const currentSector = ref('菠菜园 08 区')
 const presetSamples = ref([])
@@ -2336,9 +2365,14 @@ async function sendMessage() {
   try {
     // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
     chatAbort = new AbortController()
+    const sseToken = authToken()
     const response = await fetch('/api/screen/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // 原生 fetch 不走 axios 拦截器，令牌要手动带上
+        ...(sseToken ? { Authorization: `Bearer ${sseToken}` } : {})
+      },
       signal: chatAbort.signal,
       body: JSON.stringify({
         message: query,
@@ -2358,6 +2392,11 @@ async function sendMessage() {
         }
       })
     })
+
+    if (response.status === 401) {
+      redirectToLogin('登录状态已失效，请重新登录')
+      return
+    }
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -2585,9 +2624,10 @@ function handleResize() {
 onMounted(() => {
   handleResize()
   window.addEventListener('resize', handleResize)
+  auth.fetchMe() // 用本地令牌换最新的用户信息（角色、上次登录时间）
   loadSamples()
   restartCarousel()
-  refreshHistoryStats() // 个人中心「今日诊断」用真实计数
+  refreshHistoryStats() // 历史弹窗顶部「今日 N 次 · 共 M 条」
   refreshAlertStats() // 顶部告警胶囊的未读数
   alertPollTimer = setInterval(refreshAlertStats, 60000)
   // 灵动岛入场：从顶部缓缓落下
@@ -2707,6 +2747,40 @@ onUnmounted(() => {
 }
 
 /* 主导航项：图标 + 文字，选中态为亮绿渐变圆角块 */
+/* 品牌标签：占原来「个人中心」按钮的位置，纯展示
+   pointer-events: none 保证既点不进去、也不会弹出任何悬浮提示 */
+.brand-sticker {
+  width: 88px;
+  padding: 13px 8px 14px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #123620 0%, #0c2a1a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+
+  .sticker-leaf {
+    width: 22px;
+    height: 22px;
+    color: #6fbf8c;
+    margin-bottom: 5px;
+    opacity: 0.92;
+  }
+
+  .sticker-line {
+    font-size: 10px;
+    line-height: 1.55;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.74);
+    white-space: nowrap;
+  }
+}
+
 .nav-item-btn {
   width: 68px;
   height: 58px;
@@ -2788,41 +2862,7 @@ onUnmounted(() => {
   }
 }
 
-/* 底部品牌块：植物 + slogan（点击进入个人中心） */
-.brand-tile {
-  width: 84px;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.04);
-  padding: 14px 6px 12px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 9px;
-  cursor: pointer;
-  transition: background 0.15s ease;
-
-  .plant-icon {
-    width: 26px;
-    height: 26px;
-  }
-
-  .brand-tile-text {
-    font-size: 10px;
-    line-height: 1.7;
-    color: #7d938a;
-    text-align: center;
-    white-space: nowrap;
-  }
-
-  &:hover {
-    background: rgba(255, 255, 255, 0.08);
-
-    .brand-tile-text {
-      color: #a7bcb1;
-    }
-  }
-}
+/* 底部品牌块样式已删除：入口按钮换成纯展示的 .brand-sticker（见上） */
 
 /* ════════════════════ 2. BODY (1091px) ════════════════════ */
 .tanee-body {
@@ -2942,6 +2982,174 @@ onUnmounted(() => {
       height: 12px;
     }
   }
+}
+
+/* ── 当前登录用户：头像按钮 + 账号弹层 ───────────────────────────────── */
+.user-menu-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-avatar-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(46, 144, 85, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(46, 144, 85, 0.34);
+  }
+
+  &.active {
+    box-shadow: 0 0 0 3px rgba(53, 197, 110, 0.2);
+  }
+
+  .avatar-presence {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #17b26a;
+    border: 2px solid #ffffff;
+  }
+}
+
+.user-popover {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 236px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(24, 27, 37, 0.06);
+  box-shadow: 0 16px 40px rgba(24, 27, 37, 0.16);
+  z-index: 90;
+}
+
+.user-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .user-popover-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .user-popover-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+
+    strong {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #181b25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    span {
+      font-size: 11.5px;
+      color: #8d8d8d;
+    }
+  }
+}
+
+.user-popover-rows {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.user-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+
+  span {
+    color: #a4a4a4;
+    flex-shrink: 0;
+  }
+
+  b {
+    font-weight: 600;
+    color: #333333;
+    text-align: right;
+  }
+}
+
+.user-logout-btn {
+  margin-top: 12px;
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #f5dedb;
+  background: #fef5f4;
+  color: #cf3a28;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: #fdeceb;
+    border-color: #f1cbc6;
+  }
+}
+
+/* 透明遮罩：点画板任意位置收起弹层（画板有 transform，fixed 会相对画板铺满） */
+.user-popover-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: transparent;
 }
 
 /* 2.2 Main Content Layout (16px Padding, 2 Columns) */
@@ -5044,125 +5252,6 @@ onUnmounted(() => {
 
   &.theme-green {
     filter: sepia(0.22) hue-rotate(28deg) saturate(1.35) brightness(0.99);
-  }
-}
-
-/* ════════════════════ 个人中心 Modal ════════════════════ */
-.profile-modal-card { width: 440px; }
-
-.profile-body {
-  .profile-id-card {
-    display: flex;
-    gap: 14px;
-    align-items: center;
-
-    .profile-avatar-circle {
-      width: 56px;
-      height: 56px;
-      border-radius: 9999px;
-      background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
-      color: #ffffff;
-      font-size: 22px;
-      font-weight: 700;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      box-shadow: 0 4px 12px rgba(53, 197, 110, 0.3);
-      flex-shrink: 0;
-    }
-
-    .profile-id-info {
-      min-width: 0;
-
-      h3 { margin: 0 0 6px; font-size: 17px; color: #1e2024; }
-
-      .profile-role-tags {
-        display: flex;
-        gap: 6px;
-        margin-bottom: 6px;
-
-        .role-tag {
-          font-size: 10.5px;
-          padding: 2px 8px;
-          border-radius: 9999px;
-          font-weight: 600;
-
-          &.green { background: #f0fdf4; color: #178a56; border: 1px solid #b7e4c9; }
-          &.gray { background: #f5f5f5; color: #666666; border: 1px solid #e5e5e5; }
-        }
-      }
-
-      p { margin: 0; font-size: 11px; color: #a4a4a4; line-height: 1.4; }
-    }
-  }
-
-  .profile-stats-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-
-    .profile-stat-cell {
-      background: #f8f8f8;
-      border-radius: 10px;
-      padding: 12px 8px;
-      text-align: center;
-
-      strong { display: block; font-size: 20px; color: #178a56; }
-      span { font-size: 10.5px; color: #a4a4a4; }
-    }
-  }
-
-  .profile-info-rows {
-    background: #ffffff;
-    border: 1px solid #f0f0f0;
-    border-radius: 10px;
-    overflow: hidden;
-
-    .profile-info-row {
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      padding: 10px 14px;
-      font-size: 12.5px;
-
-      & + .profile-info-row { border-top: 1px solid #f5f5f5; }
-
-      span { color: #a4a4a4; }
-      strong { color: #333333; font-weight: 600; }
-    }
-  }
-
-  .profile-action-bar {
-    display: flex;
-    gap: 10px;
-
-    .profile-secondary-btn {
-      flex: 1;
-      border: 1px solid #dcdcdc;
-      background: #ffffff;
-      border-radius: 9px;
-      padding: 9px 0;
-      font-size: 13px;
-      color: #333333;
-      font-weight: 600;
-      cursor: pointer;
-
-      &:hover { border-color: #178a56; color: #178a56; }
-    }
-
-    .profile-primary-btn {
-      flex: 1;
-      border: none;
-      background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
-      border-radius: 9px;
-      padding: 9px 0;
-      font-size: 13px;
-      color: #ffffff;
-      font-weight: 700;
-      cursor: pointer;
-
-      &:hover { filter: brightness(1.05); }
-    }
   }
 }
 

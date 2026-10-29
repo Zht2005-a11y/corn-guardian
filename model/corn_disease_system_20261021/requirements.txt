@@ -26,6 +26,10 @@ uvicorn[standard]>=0.27.0
 python-multipart>=0.0.9
 pydantic>=2.5.0
 
+# --- 登录认证（JWT / HS256）---
+# 不装也能启动：app/auth.py 会退化为内置 HS256 实现，但推荐安装以启用完整 claims 校验
+PyJWT>=2.8.0
+
 # --- 测试 / 自检脚本 ---
 # scripts/selftest.py、verify_api.py、api_test.py 需要；FastAPI TestClient 依赖 httpx
 requests>=2.31.0
