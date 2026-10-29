@@ -531,6 +531,9 @@ Page({
       timeout: 180000,
       enableChunked: true,
       responseType: 'arraybuffer',
+      header: api.authHeader
+        ? Object.assign({ 'Content-Type': 'application/json' }, api.authHeader())
+        : { 'Content-Type': 'application/json' },
       success: () => finish(''),
       fail: (err) => {
         if (err && err.errMsg && err.errMsg.indexOf('abort') >= 0) {

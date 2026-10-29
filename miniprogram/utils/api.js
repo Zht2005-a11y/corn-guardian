@@ -33,6 +33,21 @@ function buildUrl(path) {
   return base ? `${base}/${sub}` : `/${sub}`;
 }
 
+const TOKEN_KEY = 'corn_token';
+
+/**
+ * 后端 /screen/* 需要 Bearer 令牌（auth.py 中间件），登录后把 token 存到
+ * storage 的 corn_token 即可自动带上；未登录时后端会返回 401。
+ */
+function authHeader() {
+  try {
+    const token = wx.getStorageSync(TOKEN_KEY);
+    return token ? { Authorization: 'Bearer ' + token } : {};
+  } catch (e) {
+    return {};
+  }
+}
+
 function request(path, method, data) {
   const url = buildUrl(path);
   const verb = method || 'GET';
@@ -42,6 +57,7 @@ function request(path, method, data) {
       url: url,
       method: verb,
       data: data,
+      header: Object.assign({ 'Content-Type': 'application/json' }, authHeader()),
       // 服务端实测较慢（单请求可达 20s+），30s 容易误判为不可达
       timeout: 45000,
       success(res) {
@@ -57,8 +73,13 @@ function request(path, method, data) {
           return;
         }
         const detail = (body && (body.detail || body.message)) || ('HTTP ' + res.statusCode);
-        const err = new Error(detail + '（HTTP ' + res.statusCode + ' · ' + cost + 'ms'
-          + (rid ? ' · ' + rid : '') + '）');
+        let suffix = '（HTTP ' + res.statusCode + ' · ' + cost + 'ms' + (rid ? ' · ' + rid : '') + '）';
+        if (res.statusCode === 401) {
+          suffix = '（后端要求登录令牌，请在「我的」页登录后重试 · ' + cost + 'ms）';
+        } else if (res.statusCode === 200 && typeof body === 'string') {
+          suffix = '（返回的是 HTML 而不是 JSON，通常说明 nginx 没把接口反代到后端）';
+        }
+        const err = new Error(detail + suffix);
         err.statusCode = res.statusCode;
         err.body = body;
         err.url = url;
@@ -133,6 +154,8 @@ function compressToDataUrl(filePath) {
 
 const api = {
   buildUrl,
+  authHeader,
+  TOKEN_KEY,
   notifyDebugGuidanceIfNeeded,
 
   /** 四类典型样本（含真实数据集 base64 图） */
