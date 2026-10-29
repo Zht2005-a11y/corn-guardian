@@ -1,0 +1,97 @@
+.page-body { padding-bottom: 60rpx; }
+.mode-scroll {
+  white-space: nowrap;
+  margin-bottom: 22rpx;
+}
+.demo-mark {
+  font-size: 20rpx;
+  color: #8C999C;
+  font-weight: 400;
+  margin-left: 10rpx;
+}
+
+/* 上传卡片 */
+.upload-card {
+  min-height: 380rpx;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border: 2rpx dashed rgba(11, 167, 123, 0.35);
+  padding: 40rpx 28rpx;
+}
+.upload-icon {
+  width: 110rpx;
+  height: 110rpx;
+  border-radius: 50%;
+  background: #E3F5EF;
+  padding: 26rpx;
+  box-sizing: border-box;
+}
+.upload-text { margin-top: 22rpx; font-size: 30rpx; color: #202B2D; font-weight: 500; }
+.upload-sub { margin-top: 8rpx; font-size: 22rpx; color: #8C999C; }
+.preview-img { width: 100%; height: 420rpx; border-radius: 16rpx; background: #F4F4F4; }
+.preview-actions { display: flex; gap: 20rpx; margin-top: 20rpx; }
+.mini-btn {
+  font-size: 24rpx;
+  color: #0BA77B;
+  background: #E3F5EF;
+  border-radius: 999rpx;
+  padding: 8rpx 26rpx;
+}
+.mini-btn.danger { color: #F16B5D; background: #FDECEA; }
+
+/* 多模型 */
+.cmp-note { font-size: 24rpx; color: #8C999C; margin-top: 10rpx; line-height: 1.6; }
+
+/* Base64 */
+.b64-input {
+  width: 100%;
+  height: 200rpx;
+  background: #F7FAFA;
+  border-radius: 14rpx;
+  padding: 16rpx;
+  font-size: 22rpx;
+  box-sizing: border-box;
+  margin-top: 14rpx;
+}
+
+/* 批量 */
+.batch-head { width: 100%; display: flex; justify-content: space-between; align-items: center; font-size: 26rpx; color: #4F5B5E; }
+.batch-grid { width: 100%; display: flex; flex-wrap: wrap; gap: 12rpx; margin-top: 18rpx; }
+.batch-cell { width: calc((100% - 24rpx) / 3); height: 180rpx; border-radius: 12rpx; overflow: hidden; background: #F4F4F4; }
+.batch-cell image { width: 100%; height: 100%; }
+.sum-row { display: flex; justify-content: space-between; margin-top: 20rpx; }
+.sum-item { display: flex; flex-direction: column; align-items: center; }
+.sum-item .v { font-size: 32rpx; font-weight: 600; color: #202B2D; }
+.sum-item .k { font-size: 20rpx; color: #8C999C; margin-top: 4rpx; }
+.dist-row { display: flex; flex-wrap: wrap; gap: 16rpx 28rpx; }
+.dist-item { display: flex; align-items: center; font-size: 24rpx; color: #4F5B5E; }
+.dist-item .dot { width: 18rpx; height: 18rpx; border-radius: 6rpx; margin-right: 8rpx; }
+.batch-items { margin-top: 18rpx; }
+.batch-item {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  padding: 14rpx 0;
+  border-bottom: 1rpx solid #E9EFF0;
+  font-size: 24rpx;
+}
+.batch-item:last-child { border-bottom: none; }
+.bi-name { flex: 1; color: #202B2D; }
+.bi-rate { color: #FF984F; }
+
+/* 示例 */
+.example-row { display: flex; justify-content: space-between; margin-top: 20rpx; }
+.example-item { width: 23%; display: flex; flex-direction: column; align-items: center; }
+.example-item image {
+  width: 100%;
+  height: 130rpx;
+  border-radius: 14rpx;
+  background: #F4F4F4;
+}
+.example-item text { margin-top: 10rpx; font-size: 22rpx; color: #4F5B5E; }
+
+/* 底部按钮 */
+.bottom-btn { margin-top: 10rpx; }
+.bottom-hint { text-align: center; font-size: 22rpx; color: #8C999C; margin-top: 14rpx; }

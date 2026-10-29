@@ -1,0 +1,259 @@
+.chat-page {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: #F2F8F8;
+  /* 底部让出自定义 TabBar 的位置 */
+  padding-bottom: calc(112rpx + env(safe-area-inset-bottom));
+  box-sizing: border-box;
+}
+
+/* ---------- 顶部状态栏 ---------- */
+.top-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 28rpx 6rpx;
+}
+.status { display: flex; align-items: center; gap: 10rpx; }
+.status-dot {
+  width: 14rpx; height: 14rpx;
+  border-radius: 50%;
+  background: #C4CDD0;
+}
+.status-dot.on { background: #20A67A; box-shadow: 0 0 8rpx rgba(32, 166, 122, 0.6); }
+.status-text { font-size: 22rpx; color: #8C999C; }
+.top-actions { display: flex; gap: 14rpx; }
+.top-chip {
+  font-size: 22rpx;
+  color: #4F5B5E;
+  background: #FFFFFF;
+  border: 1rpx solid #E9EFF0;
+  border-radius: 999rpx;
+  padding: 8rpx 24rpx;
+}
+.top-chip.primary {
+  color: #0BA77B;
+  background: #E3F5EF;
+  border-color: #E3F5EF;
+  font-weight: 500;
+}
+
+/* ---------- 对话区 ---------- */
+.chat-scroll { flex: 1; overflow: hidden; }
+.chat-list { padding: 20rpx 24rpx; }
+.scroll-pad { height: 30rpx; }
+.row { display: flex; margin-bottom: 28rpx; }
+.user-row { justify-content: flex-end; }
+.ai-row { justify-content: flex-start; align-items: flex-start; gap: 14rpx; }
+
+.ai-avatar {
+  width: 68rpx; height: 68rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #19C995, #079B76);
+  flex-shrink: 0;
+}
+
+.bubble { max-width: 78%; }
+.user-bubble {
+  background: linear-gradient(135deg, #19C995, #079B76);
+  color: #fff;
+  border-radius: 28rpx 6rpx 28rpx 28rpx;
+  padding: 22rpx 26rpx;
+  font-size: 27rpx;
+  line-height: 1.65;
+}
+.ai-bubble {
+  background: #fff;
+  border-radius: 6rpx 28rpx 28rpx 28rpx;
+  padding: 22rpx 26rpx;
+  box-shadow: 0 4rpx 16rpx rgba(42, 84, 78, 0.06);
+  flex: 1;
+  max-width: 82%;
+}
+.welcome-bubble { flex: none; max-width: 82%; }
+.wb-title { font-size: 27rpx; font-weight: 600; color: #202B2D; margin-bottom: 12rpx; }
+.wb-item { font-size: 24rpx; color: #4F5B5E; margin-top: 6rpx; line-height: 1.7; }
+
+.ai-text {
+  font-size: 27rpx;
+  color: #202B2D;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+/* ── 流式输出两层（桌面端 Layout.vue 同构）：① Typewriter 匀速上屏（JS）② 逐词 blurIn 渐显 ── */
+/* 词元必须用 inline-block view 承载动画：<text> 子节点上的 CSS 动画开发者工具不执行 */
+.sd-tok {
+  display: inline-block;
+  white-space: pre-wrap;
+  vertical-align: baseline;
+}
+/* blurIn 450ms + 自定义缓动，与 Streamdown animated:{animation:'blurIn',duration:450} 一致 */
+.sd-anim {
+  animation: sd-blurIn 450ms cubic-bezier(0.25, 0.6, 0.3, 1) backwards;
+}
+@keyframes sd-blurIn {
+  from { opacity: 0; filter: blur(4px); }
+  to { opacity: 1; filter: blur(0); }
+}
+/* 圆形流式光标（桌面端 caret="circle"），随尾部文本同色呼吸 */
+.sd-caret {
+  color: #0BA77B;
+  font-size: 18rpx;
+  line-height: 1;
+  vertical-align: 2rpx;
+  margin-left: 4rpx;
+  animation: caret-pulse 1s ease-in-out infinite;
+}
+@keyframes caret-pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+/* 流式尾部渐隐：最新文字从柔和淡出中浮现（白色叠加层，不依赖 mask/动画，任何渲染器安全） */
+.ai-text-wrap { position: relative; }
+.ai-text-wrap.streaming::after {
+  content: '';
+  position: absolute;
+  left: -4rpx;
+  right: -4rpx;
+  bottom: -8rpx;
+  height: 30rpx;
+  background: linear-gradient(to bottom, rgba(255, 255, 255, 0), #FFFFFF 82%);
+  pointer-events: none;
+}
+
+.ai-status {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  color: #0BA77B;
+}
+.loading-dot {
+  width: 12rpx; height: 12rpx;
+  border-radius: 50%;
+  background: #19C995;
+  animation: blink 1s infinite;
+}
+@keyframes blink { 50% { opacity: 0.25; } }
+.ai-error {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-top: 14rpx;
+  font-size: 22rpx;
+  color: #F16B5D;
+}
+.retry-btn {
+  color: #0BA77B;
+  background: #E3F5EF;
+  border-radius: 999rpx;
+  padding: 4rpx 20rpx;
+}
+
+/* 快捷问题 */
+.quick-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18rpx;
+  margin: 8rpx 0 20rpx 82rpx;
+}
+.quick-chip {
+  background: #E3F5EF;
+  color: #0BA77B;
+  font-size: 24rpx;
+  border-radius: 999rpx;
+  padding: 14rpx 30rpx;
+}
+.offline-tip { font-size: 22rpx; color: #8C999C; margin-top: 8rpx; }
+
+/* 联网检索来源 */
+.source-card {
+  margin-top: 18rpx;
+  background: #F4F8F8;
+  border-radius: 16rpx;
+  padding: 18rpx 20rpx;
+}
+.sc-title { font-size: 23rpx; font-weight: 600; color: #4F5B5E; }
+.sc-item { font-size: 22rpx; color: #8C999C; margin-top: 8rpx; word-break: break-all; }
+.sc-foot { font-size: 20rpx; color: #8C999C; margin-top: 10rpx; }
+
+/* ---------- 历史会话浮层 ---------- */
+.mask {
+  position: fixed;
+  left: 0; top: 0; right: 0; bottom: 0;
+  background: rgba(24, 27, 37, 0.35);
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+}
+.session-panel {
+  width: 100%;
+  background: #fff;
+  border-radius: 28rpx 28rpx 0 0;
+  padding: 30rpx 28rpx calc(30rpx + env(safe-area-inset-bottom));
+  max-height: 65vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+.panel-title { font-size: 28rpx; font-weight: 600; color: #202B2D; margin-bottom: 16rpx; }
+.panel-empty { font-size: 24rpx; color: #8C999C; padding: 30rpx 0; text-align: center; }
+.panel-scroll { max-height: 48vh; }
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #E9EFF0;
+}
+.session-item:last-child { border-bottom: none; }
+.s-title {
+  font-size: 26rpx;
+  color: #202B2D;
+  max-width: 560rpx;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.s-time { font-size: 20rpx; color: #8C999C; margin-top: 4rpx; }
+.s-arrow { width: 28rpx; height: 28rpx; }
+
+/* ---------- 底部输入栏 ---------- */
+.input-bar {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  background: rgba(255, 255, 255, 0.98);
+  padding: 16rpx 24rpx;
+  border-top: 1rpx solid #E9EFF0;
+}
+.input {
+  flex: 1;
+  background: #F4F8F8;
+  border-radius: 999rpx;
+  padding: 18rpx 30rpx;
+  font-size: 28rpx;
+}
+.send-btn {
+  width: 76rpx; height: 76rpx;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #19C995, #079B76);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.send-btn image { width: 38rpx; height: 38rpx; }
+.stop-btn {
+  height: 76rpx;
+  padding: 0 34rpx;
+  border-radius: 999rpx;
+  background: #FFF0E6;
+  color: #FF984F;
+  font-size: 26rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}

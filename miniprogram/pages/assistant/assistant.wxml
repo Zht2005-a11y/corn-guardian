@@ -1,0 +1,122 @@
+<view class="chat-page">
+  <!-- 顶部状态栏：在线状态 + 历史会话/新对话 -->
+  <view class="top-bar">
+    <view class="status">
+      <view class="status-dot {{online ? 'on' : ''}}"></view>
+      <text class="status-text">{{online ? '在线' : '离线（后端未连接）'}}</text>
+    </view>
+    <view class="top-actions">
+      <view class="top-chip" bindtap="toggleSessions">历史</view>
+      <view class="top-chip primary" bindtap="newChat">新对话</view>
+    </view>
+  </view>
+
+  <!-- 对话区 -->
+  <scroll-view
+    class="chat-scroll"
+    scroll-y
+    scroll-into-view="{{scrollTo}}"
+    scroll-with-animation
+  >
+    <view class="chat-list">
+      <!-- 欢迎气泡（常驻顶部，品牌锚点） -->
+      <view class="row ai-row">
+        <image class="ai-avatar" src="{{icons.avatar}}" mode="aspectFit" />
+        <view class="bubble ai-bubble welcome-bubble">
+          <view class="wb-title">你好！我是 AI 植保助手。</view>
+          <view class="wb-item">· 识别病害与防治建议</view>
+          <view class="wb-item">· 查询农资价格、市场行情</view>
+          <view class="wb-item">· 解读农业政策与技术资料</view>
+          <view class="wb-item">· 根据识别结果和 24h 气候数据提供建议</view>
+        </view>
+      </view>
+
+      <!-- 快捷问题（仅空对话时显示） -->
+      <view wx:if="{{!messages.length}}" class="quick-wrap" style="width: 585rpx; display: flex; box-sizing: border-box">
+        <view
+          wx:for="{{quickQuestions}}"
+          wx:key="*this"
+          class="quick-chip"
+          data-q="{{item}}"
+          bindtap="askQuick"
+         style="width: 249rpx; height: 64rpx; display: block; box-sizing: border-box">{{item}}</view>
+        <view wx:if="{{!sessions.length && !online}}" class="offline-tip">后端未连接时无法问答，请先启动本地后端（run_backend.bat）</view>
+      </view>
+
+      <!-- 消息列表 -->
+      <block wx:for="{{messages}}" wx:key="id">
+        <!-- 用户消息 -->
+        <view wx:if="{{item.role === 'user'}}" class="row user-row" id="msg-{{item.id}}">
+          <view class="bubble user-bubble">{{item.content}}</view>
+        </view>
+
+        <!-- AI 消息 -->
+        <view wx:else class="row ai-row" id="msg-{{item.id}}">
+          <image class="ai-avatar" src="{{icons.avatar}}" mode="aspectFit" />
+          <view class="bubble ai-bubble">
+            <!-- 流式两层：Typewriter 匀速上屏 + 词元 view 逐词 blurIn 渐显（桌面端 Streamdown 同款）；动画必须挂 view，text 子节点不执行 -->
+            
+
+            <view wx:if="{{item.status}}" class="ai-status">
+              <view class="loading-dot"></view>
+              <text>{{item.status}}</text>
+            </view>
+
+            <!-- 联网检索来源 -->
+            <view wx:if="{{item.queries.length}}" class="source-card">
+              <view class="sc-title">联网检索 · 数据来源</view>
+              <view wx:for="{{item.queries}}" wx:for-item="q" wx:key="*this" class="sc-item">· {{q}}</view>
+              <view class="sc-foot">来源：360 / 搜狗 / 百度（国内直连检索）</view>
+            </view>
+
+            <view wx:if="{{item.error}}" class="ai-error">
+              <text>{{item.error}}</text>
+              <text class="retry-btn" data-id="{{item.id}}" bindtap="retryLast">重试</text>
+            </view>
+          </view>
+        </view>
+      </block>
+      <view class="scroll-pad" id="scroll-pad"></view>
+    </view>
+  </scroll-view>
+
+  <!-- 历史会话浮层 -->
+  <view wx:if="{{showSessions}}" class="mask" bindtap="closeSessions">
+    <view class="session-panel" catchtap="noop">
+      <view class="panel-title">最近会话</view>
+      <view wx:if="{{!sessions.length}}" class="panel-empty">暂无历史会话</view>
+      <scroll-view scroll-y class="panel-scroll">
+        <view
+          wx:for="{{sessions}}"
+          wx:key="session_id"
+          class="session-item"
+          data-sid="{{item.session_id}}"
+          bindtap="openSession"
+        >
+          <view class="s-main">
+            <view class="s-title">{{item.title}}</view>
+            <view class="s-time">{{item.modified}}{{item.interrupted ? ' · 已中断' : ''}}</view>
+          </view>
+          <image class="s-arrow" src="{{icons.arrow}}" mode="aspectFit" />
+        </view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- 底部输入栏 -->
+  <view class="input-bar">
+    <input
+      class="input"
+      value="{{draft}}"
+      placeholder="{{streaming ? '正在回答中…' : '请输入你的问题…'}}"
+      confirm-type="send"
+      disabled="{{streaming}}"
+      bindinput="onInput"
+      bindconfirm="send"
+    />
+    <view wx:if="{{streaming}}" class="stop-btn" bindtap="stopGen">停止</view>
+    <view wx:else class="send-btn" bindtap="send">
+      <image style="width: 44rpx; height: 44rpx" src="{{icons.send}}" mode="aspectFit" />
+    </view>
+  </view>
+</view>

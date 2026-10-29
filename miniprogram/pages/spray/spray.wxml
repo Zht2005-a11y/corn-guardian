@@ -1,0 +1,120 @@
+<view class="page-body" wx:if="{{hasResult}}">
+  <!-- 顶部绿色处方横幅 -->
+  <view class="rx-banner">
+    <image class="rx-drone" src="{{icons.droneWhite}}" mode="aspectFit" />
+    <view class="rx-text">
+      <view class="rx-title">已生成无人机变量施药处方</view>
+      <view class="rx-sub">基于病害识别结果和受损等级</view>
+    </view>
+  </view>
+
+  <!-- 识别依据 -->
+  <view class="card basis-card">
+    <view class="basis-row">
+      <text class="k">识别病害</text>
+      <text class="v">{{result.class_name_cn}}</text>
+    </view>
+    <view class="basis-row">
+      <text class="k">发病等级</text>
+      <view class="tag {{tagCls}}">{{tagText}}</view>
+    </view>
+    <view class="basis-row">
+      <text class="k">叶面积受损率</text>
+      <text class="v orange">{{result.damageRate}}%</text>
+    </view>
+  </view>
+
+  <!-- 推荐药剂 -->
+  <view class="card">
+    <view class="card-title">推荐药剂</view>
+    <view class="med-card">
+      <view class="med-head">
+        <view class="med-name">{{result.class_name_cn}}防治方案</view>
+        <view class="tag tag-green">{{prescriptionLevel || '推荐'}}</view>
+      </view>
+      <view class="med-desc">{{result.prescription}}</view>
+      <view class="med-dose" wx:if="{{result.prescriptionDose}}">用药剂量：{{result.prescriptionDose}}</view>
+    </view>
+    <view wx:if="{{notes.length}}" class="med-notes">
+      <view wx:for="{{notes}}" wx:key="index" class="note-row">
+        <view class="note-dot"></view>
+        <text>{{item}}</text>
+      </view>
+    </view>
+    <view class="med-tip">药剂推荐由后端处方规则基于识别结果动态生成，实际用药请以当地植保部门登记信息为准。</view>
+  </view>
+
+  <!-- 作业参数 -->
+  <view class="card">
+    <view class="card-title">作业参数</view>
+    <view class="param-row">
+      <view class="param-left">
+        <image src="{{icons.drone}}" mode="aspectFit" />
+        <text>推荐机型</text>
+      </view>
+      <text class="param-val">{{result.droneParams.model}}</text>
+    </view>
+    <view class="param-row">
+      <view class="param-left">
+        <image src="{{icons.drop}}" mode="aspectFit" />
+        <text>亩施液量</text>
+      </view>
+      <text class="param-val">{{result.droneParams.volume}}</text>
+    </view>
+    <view class="param-row">
+      <view class="param-left">
+        <image src="{{icons.size}}" mode="aspectFit" />
+        <text>雾滴粒径</text>
+      </view>
+      <text class="param-val">{{result.droneParams.dropletSize}}</text>
+    </view>
+    <view class="param-row">
+      <view class="param-left">
+        <image src="{{icons.height}}" mode="aspectFit" />
+        <text>作业高度</text>
+      </view>
+      <text class="param-val">{{result.droneParams.altitude}}</text>
+    </view>
+    <view class="param-row">
+      <view class="param-left">
+        <image src="{{icons.speed}}" mode="aspectFit" />
+        <text>作业速度</text>
+      </view>
+      <text class="param-val">{{result.droneParams.speed}}</text>
+    </view>
+  </view>
+
+  <!-- 详细处方 -->
+  <view class="card" wx:if="{{showDetail}}">
+    <view class="card-title">处方详情与风险提示</view>
+    <view class="detail-block">
+      <text class="detail-k">处方等级</text>
+      <text class="detail-v">{{result.prescriptionLevel || '—'}}</text>
+    </view>
+    <view class="detail-block">
+      <text class="detail-k">处方依据</text>
+      <text class="detail-v">ResNet50-CBAM 识别结果 + Grad-CAM 高响应区受损率估算（非人工标注真值）</text>
+    </view>
+    <view class="detail-block">
+      <text class="detail-k">风险提示</text>
+      <text class="detail-v">避开高温时段与花期施药；风力大于 5 m/s 或降雨前 2 小时内禁止作业；作业前需人工复核处方参数。</text>
+    </view>
+    <view class="detail-block">
+      <text class="detail-k">人工复核</text>
+      <text class="detail-v warn">待复核 —— 处方由 AI 生成，作业前请由飞手/植保员确认。</text>
+    </view>
+  </view>
+
+  <button class="btn-primary" bindtap="toggleDetail">
+    {{showDetail ? '收起详细处方' : '查看详细处方'}}
+  </button>
+  <view class="gap"></view>
+</view>
+
+<view wx:else class="page-body empty-wrap">
+  <view class="card empty-card">
+    <image class="empty-icon" src="{{icons.drone}}" mode="aspectFit" />
+    <view class="center-tip">尚未生成处方，请先完成一次病害识别</view>
+    <button class="btn-ghost" bindtap="goIdentify">去识别</button>
+  </view>
+</view>

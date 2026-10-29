@@ -1,0 +1,97 @@
+.rx-banner {
+  display: flex;
+  align-items: center;
+  gap: 24rpx;
+  background: linear-gradient(135deg, #19C995, #079B76);
+  border-radius: 28rpx;
+  padding: 34rpx 30rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 8rpx 24rpx rgba(11, 167, 123, 0.28);
+}
+.rx-drone { width: 84rpx; height: 84rpx; }
+.rx-title { color: #fff; font-size: 32rpx; font-weight: 600; }
+.rx-sub { color: rgba(255, 255, 255, 0.85); font-size: 22rpx; margin-top: 6rpx; }
+
+/* 识别依据 */
+.basis-card { padding: 22rpx 28rpx; }
+.basis-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10rpx 0;
+  font-size: 26rpx;
+}
+.basis-row .k { color: #8C999C; }
+.basis-row .v { color: #202B2D; font-weight: 500; }
+.basis-row .v.orange { color: #FF984F; font-weight: 600; }
+
+/* 药剂 */
+.med-card {
+  background: #F6FBF9;
+  border: 1rpx solid #E3F5EF;
+  border-radius: 18rpx;
+  padding: 22rpx;
+  margin-top: 18rpx;
+}
+.med-head { display: flex; justify-content: space-between; align-items: center; }
+.med-name { font-size: 28rpx; font-weight: 500; color: #202B2D; }
+.med-desc { font-size: 24rpx; color: #4F5B5E; margin-top: 12rpx; line-height: 1.7; }
+.med-dose { font-size: 24rpx; color: #0BA77B; margin-top: 10rpx; }
+.med-notes { margin-top: 16rpx; }
+.note-row {
+  display: flex;
+  align-items: flex-start;
+  font-size: 24rpx;
+  color: #4F5B5E;
+  margin-top: 10rpx;
+  line-height: 1.6;
+}
+.note-dot {
+  width: 10rpx; height: 10rpx;
+  border-radius: 50%;
+  background: #19C995;
+  margin: 14rpx 12rpx 0 0;
+  flex-shrink: 0;
+}
+.med-tip { margin-top: 16rpx; font-size: 20rpx; color: #8C999C; line-height: 1.6; }
+
+/* 作业参数 */
+.param-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22rpx 0;
+  border-bottom: 1rpx solid #E9EFF0;
+}
+.param-row:last-child { border-bottom: none; }
+.param-left {
+  display: flex;
+  align-items: center;
+  gap: 14rpx;
+  font-size: 26rpx;
+  color: #4F5B5E;
+}
+.param-left image { width: 34rpx; height: 34rpx; }
+.param-val { font-size: 26rpx; color: #202B2D; font-weight: 500; }
+
+/* 处方详情 */
+.detail-block { margin-top: 18rpx; }
+.detail-k {
+  display: block;
+  font-size: 24rpx;
+  color: #8C999C;
+}
+.detail-v {
+  display: block;
+  font-size: 25rpx;
+  color: #202B2D;
+  margin-top: 6rpx;
+  line-height: 1.7;
+}
+.detail-v.warn { color: #FF984F; }
+.gap { height: 40rpx; }
+
+/* 空状态 */
+.empty-card { display: flex; flex-direction: column; align-items: center; padding: 60rpx 40rpx; }
+.empty-icon { width: 100rpx; height: 100rpx; opacity: 0.5; }
+.empty-wrap .btn-ghost { width: 320rpx; margin-top: 10rpx; }

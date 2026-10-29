@@ -1,0 +1,112 @@
+.dual-img { display: flex; gap: 18rpx; }
+.dual-col { flex: 1; position: relative; }
+.img-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6rpx;
+  background: rgba(32, 43, 45, 0.55);
+  color: #fff;
+  font-size: 20rpx;
+  border-radius: 8rpx;
+  padding: 4rpx 14rpx;
+  position: absolute;
+  top: 12rpx;
+  left: 12rpx;
+  z-index: 2;
+}
+.img-tag.hot { background: rgba(11, 167, 123, 0.85); }
+.tag-icon { width: 22rpx; height: 22rpx; }
+.dual-pic {
+  width: 100%;
+  height: 300rpx;
+  border-radius: 16rpx;
+  background: #F4F4F4;
+}
+.dual-pic.empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8C999C;
+  font-size: 24rpx;
+}
+
+/* 识别结论 */
+.result-head { display: flex; align-items: center; gap: 18rpx; }
+.disease-badge {
+  width: 72rpx; height: 72rpx;
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+.disease-badge image { width: 40rpx; height: 40rpx; }
+.disease-name { flex: 1; font-size: 36rpx; font-weight: 600; color: #202B2D; }
+.conf-row { display: flex; align-items: center; margin-top: 28rpx; }
+.conf-item { flex: 1; }
+.conf-k { font-size: 24rpx; color: #8C999C; }
+.conf-v { font-size: 44rpx; font-weight: 600; color: #0BA77B; margin-top: 4rpx; }
+.conf-v.orange { color: #FF984F; }
+.conf-v .pct { font-size: 26rpx; margin-left: 4rpx; }
+.conf-divider { width: 1rpx; height: 64rpx; background: #E9EFF0; margin: 0 24rpx; }
+.pathogen { margin-top: 20rpx; font-size: 22rpx; color: #8C999C; }
+
+/* 受损率评估 */
+.assess-row { display: flex; gap: 24rpx; }
+.assess-left, .assess-right { flex: 1; }
+.sec-title { font-size: 26rpx; font-weight: 500; color: #202B2D; }
+.ring-wrap { position: relative; width: 200rpx; height: 200rpx; margin: 20rpx auto 0; }
+.ring-canvas { width: 200rpx; height: 200rpx; }
+.ring-center {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.ring-v { font-size: 34rpx; font-weight: 600; color: #202B2D; }
+.assess-right { display: flex; flex-direction: column; }
+.level-text { font-size: 40rpx; font-weight: 600; color: #FF984F; margin-top: 26rpx; }
+.level-bar { margin-top: 18rpx; }
+.level-bar-bg {
+  height: 16rpx;
+  background: #EAF1F1;
+  border-radius: 999rpx;
+  overflow: hidden;
+}
+.level-bar-fill {
+  height: 100%;
+  border-radius: 999rpx;
+  background: linear-gradient(90deg, #19C995, #FF984F);
+}
+.level-scale {
+  display: flex;
+  justify-content: space-between;
+  font-size: 20rpx;
+  color: #8C999C;
+  margin-top: 8rpx;
+}
+
+/* 病斑定位 */
+.loc-wrap { position: relative; margin-top: 20rpx; }
+.loc-img { width: 100%; border-radius: 16rpx; }
+.loc-box {
+  position: absolute;
+  border: 3rpx solid #19C995;
+  border-radius: 8rpx;
+  box-shadow: 0 0 0 1rpx rgba(0, 0, 0, 0.15) inset;
+}
+.loc-label {
+  position: absolute;
+  top: -34rpx;
+  left: 0;
+  background: rgba(7, 155, 118, 0.9);
+  color: #fff;
+  font-size: 18rpx;
+  border-radius: 6rpx;
+  padding: 2rpx 10rpx;
+  white-space: nowrap;
+}
+
+/* 概率分布 */
+.prob-row { display: flex; align-items: center; gap: 14rpx; margin-top: 18rpx; }
+.prob-name { width: 110rpx; font-size: 22rpx; color: #4F5B5E; }
+.prob-bar-bg { flex: 1; height: 14rpx; background: #EAF1F1; border-radius: 999rpx; overflow: hidden; }
+.prob-bar { height: 100%; border-radius: 999rpx; }
+.prob-val { width: 84rpx; text-align: right; font-size: 22rpx; color: #4F5B5E; }
+
+.gap { height: 40rpx; }

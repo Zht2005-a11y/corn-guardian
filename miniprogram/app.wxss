@@ -1,0 +1,179 @@
+/* ==========================================================================
+   全局设计系统 —— 浅色自然清新风格
+   与参考图一致：极浅青绿背景 + 白色圆角卡片 + 翡翠绿主按钮
+   ========================================================================== */
+page {
+  --bg-page: #F2F8F8;
+  --bg-grad: #EAF5F5;
+  --card: #FFFFFF;
+  --brand: #0BA77B;
+  --btn-grad-a: #19C995;
+  --btn-grad-b: #079B76;
+  --green-bg: #E3F5EF;
+  --blue-bg: #E7F3FF;
+  --purple-bg: #F0EAFE;
+  --orange-bg: #FFF0E6;
+  --text-1: #202B2D;
+  --text-2: #4F5B5E;
+  --text-3: #8C999C;
+  --line: #E9EFF0;
+  --tag-mild: #21A67A;
+  --tag-moderate: #FF984F;
+  --tag-severe: #F16B5D;
+  --tag-healthy: #20A67A;
+
+  background: var(--bg-page);
+  color: var(--text-1);
+  font-family: -apple-system, BlinkMacSystemFont, "Helvetica Neue", "PingFang SC",
+    "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+/* 页面容器 */
+.page-body {
+  padding: 24rpx 24rpx calc(40rpx + env(safe-area-inset-bottom));
+}
+
+/* 白色卡片 */
+.card {
+  background: var(--card);
+  border-radius: 28rpx;
+  padding: 28rpx;
+  margin-bottom: 22rpx;
+  box-shadow: 0 4rpx 20rpx rgba(42, 84, 78, 0.06);
+  border: 1rpx solid rgba(233, 239, 240, 0.9);
+  box-sizing: border-box;
+}
+.card-title {
+  font-size: 30rpx;
+  font-weight: 600;
+  color: var(--text-1);
+}
+
+/* 绿色渐变主按钮 */
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 92rpx;
+  border-radius: 999rpx;
+  background: linear-gradient(135deg, var(--btn-grad-a), var(--btn-grad-b));
+  color: #fff;
+  font-size: 32rpx;
+  font-weight: 500;
+  border: none;
+  line-height: 1;
+}
+.btn-primary::after { border: none; }
+.btn-primary[disabled] {
+  opacity: 0.55;
+  color: #fff;
+}
+/* 次级按钮（白底描边） */
+.btn-ghost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 80rpx;
+  border-radius: 999rpx;
+  background: #fff;
+  color: var(--brand);
+  font-size: 28rpx;
+  border: 2rpx solid rgba(11, 167, 123, 0.35);
+  line-height: 1;
+}
+.btn-ghost::after { border: none; }
+
+/* 状态标签 */
+.tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 6rpx 18rpx;
+  border-radius: 999rpx;
+  font-size: 22rpx;
+  line-height: 1.4;
+}
+.tag-green  { background: var(--green-bg);  color: var(--tag-mild); }
+.tag-orange { background: var(--orange-bg); color: var(--tag-moderate); }
+.tag-red    { background: #FDECEA; color: var(--tag-severe); }
+.tag-gray   { background: #F1F4F5; color: var(--text-3); }
+
+/* 分割线 */
+.hr {
+  height: 1rpx;
+  background: var(--line);
+  margin: 20rpx 0;
+}
+
+/* 页面标题栏（非 tab 页） */
+.page-header {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 24rpx;
+}
+.page-header .back {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2rpx 10rpx rgba(42, 84, 78, 0.08);
+}
+.page-header .title {
+  flex: 1;
+  text-align: center;
+  font-size: 34rpx;
+  font-weight: 600;
+  color: var(--text-1);
+  margin-right: 64rpx; /* 与返回按钮同宽，保证标题视觉居中 */
+}
+
+/* 胶囊切换容器 */
+.pill-tabs {
+  display: flex;
+  background: #EAF1F1;
+  border-radius: 999rpx;
+  padding: 6rpx;
+}
+.pill-tabs.scroll {
+  display: inline-flex;
+  min-width: 100%;
+}
+.pill-tabs .pill {
+  flex: 1;
+  text-align: center;
+  padding: 14rpx 24rpx;
+  border-radius: 999rpx;
+  font-size: 26rpx;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+.pill-tabs .pill.active {
+  background: var(--brand);
+  color: #fff;
+  font-weight: 500;
+}
+
+/* 空状态 / 加载中 */
+.center-tip {
+  text-align: center;
+  color: var(--text-3);
+  font-size: 26rpx;
+  padding: 60rpx 0;
+}
+.loading-dot {
+  display: inline-block;
+  width: 16rpx;
+  height: 16rpx;
+  border-radius: 50%;
+  background: var(--brand);
+  margin-right: 10rpx;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 0.25; }
+  50% { opacity: 1; }
+}

@@ -1,0 +1,103 @@
+<view class="page-body" wx:if="{{result}}">
+  <!-- 原图 / 热力图对比 -->
+  <view class="card">
+    <view class="dual-img">
+      <view class="dual-col">
+        <view class="img-tag">原图</view>
+        <image class="dual-pic" src="{{imagePath}}" mode="aspectFill" />
+      </view>
+      <view class="dual-col">
+        <view class="img-tag hot">
+          <text>热力图</text>
+          <image class="tag-icon" src="{{icons.gradcam}}" mode="aspectFit" />
+        </view>
+        <image wx:if="{{result.gradcam_base64}}" class="dual-pic" src="{{result.gradcam_base64}}" mode="aspectFill" />
+        <view wx:else class="dual-pic empty">热力图待生成</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 识别结论 -->
+  <view class="card">
+    <view class="result-head">
+      <view class="disease-badge" style="background: {{tagBg}};">
+        <image src="{{icons.leaf}}" mode="aspectFit" />
+      </view>
+      <view class="disease-name">{{result.class_name_cn}}</view>
+      <view class="tag {{tagCls}}">{{tagText}}</view>
+    </view>
+    <view class="conf-row">
+      <view class="conf-item">
+        <view class="conf-k">识别置信度</view>
+        <view class="conf-v">{{result.confidence}}<text class="pct">%</text></view>
+      </view>
+      <view class="conf-divider"></view>
+      <view class="conf-item">
+        <view class="conf-k">叶面积受损率</view>
+        <view class="conf-v orange">{{result.damageRate}}<text class="pct">%</text></view>
+      </view>
+    </view>
+    <view class="pathogen" wx:if="{{result.pathogen}}">病原：{{result.pathogen}} · 模型 {{result.model_used}} · 耗时 {{result.inference_ms}}ms</view>
+  </view>
+
+  <!-- 受损率评估 -->
+  <view class="card">
+    <view class="assess-row">
+      <view class="assess-left">
+        <view class="sec-title">叶面积受损率</view>
+        <view class="ring-wrap">
+          <canvas type="2d" id="ring" class="ring-canvas"></canvas>
+          <view class="ring-center">
+            <text class="ring-v">{{result.damageRate}}%</text>
+          </view>
+        </view>
+      </view>
+      <view class="assess-right">
+        <view class="sec-title">发病等级</view>
+        <view class="level-text">{{tagText}}</view>
+        <view class="level-bar">
+          <view class="level-bar-bg">
+            <view class="level-bar-fill" style="width: {{levelPercent}}%;"></view>
+          </view>
+          <view class="level-scale">
+            <text>轻</text><text>中</text><text>重</text><text>危</text>
+          </view>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- 病斑定位框 -->
+  <view class="card">
+    <view class="sec-title">病斑定位框</view>
+    <view wx:if="{{result.boxes.length}}" class="loc-wrap">
+      <image class="loc-img" src="{{imagePath}}" mode="widthFix" />
+      <view
+        wx:for="{{result.boxes}}"
+        wx:key="index"
+        class="loc-box"
+        style="left: {{item.x}}%; top: {{item.y}}%; width: {{item.w}}%; height: {{item.h}}%;"
+      >
+        <text class="loc-label">{{item.label}} {{item.conf}}</text>
+      </view>
+    </view>
+    <view wx:else class="center-tip">健康叶片，未检出病斑定位框</view>
+  </view>
+
+  <!-- 置信度分布（多模型对比维度） -->
+  <view class="card" wx:if="{{probList.length}}">
+    <view class="sec-title">类别置信度分布</view>
+    <view wx:for="{{probList}}" wx:key="name" class="prob-row">
+      <text class="prob-name">{{item.name}}</text>
+      <view class="prob-bar-bg">
+        <view class="prob-bar" style="width: {{item.value}}%; background: {{item.color}};"></view>
+      </view>
+      <text class="prob-val">{{item.value}}%</text>
+    </view>
+  </view>
+
+  <button class="btn-primary" bindtap="goSpray">查看飞防方案</button>
+  <view class="gap"></view>
+</view>
+
+<view wx:else class="center-tip page-body">未获取到识别结果，请先完成一次识别</view>
