@@ -15,8 +15,8 @@
             </div>
           </div>
 
-          <!-- Upper Menu Navigation (2 icons: Home, 病害图鉴) -->
-          <div class="menu-container upper">
+          <!-- Main Navigation -->
+          <nav class="menu-container upper">
             <button
               class="nav-item-btn"
               :class="{ active: activeNav === 'home' }"
@@ -24,6 +24,7 @@
               title="总览仪表盘"
             >
               <img src="/tanee/svg/dashboard/icon-16.svg" alt="Home" class="nav-svg-icon white-filter"/>
+              <span class="nav-label">首页</span>
             </button>
 
             <button
@@ -33,26 +34,47 @@
               title="病害图鉴与防治知识库"
             >
               <!-- Book / Knowledge Base Icon -->
-              <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
+              <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                 <path d="M3 4.5C3 3.7 3.7 3 4.5 3H9v14H4.5C3.7 17 3 16.3 3 15.5V4.5Z"/>
                 <path d="M17 4.5C17 3.7 16.3 3 15.5 3H11v14h4.5c.8 0 1.5-.7 1.5-1.5V4.5Z"/>
                 <line x1="5.5" y1="6.5" x2="7" y2="6.5"/>
                 <line x1="13" y1="6.5" x2="14.5" y2="6.5"/>
               </svg>
+              <span class="nav-label">病害图鉴</span>
             </button>
-          </div>
+
+            <button
+              class="nav-item-btn"
+              :class="{ active: activeNav === 'decision' }"
+              @click="activeNav = 'decision'; activeModal = 'djiShop'"
+              title="无人机推荐 · DJI 商城"
+            >
+              <el-icon :size="20"><Aim /></el-icon>
+              <span class="nav-label">无人机推荐</span>
+            </button>
+
+            <button
+              class="nav-item-btn"
+              :class="{ active: activeNav === 'settings' }"
+              @click="activeNav = 'settings'"
+              title="系统设置"
+            >
+              <el-icon :size="20"><Setting /></el-icon>
+              <span class="nav-label">系统设置</span>
+            </button>
+          </nav>
 
           <!-- Lower Menu Navigation (Pinned to bottom: Theme, User) -->
           <div class="menu-container lower">
             <div class="theme-menu-wrap">
               <button
-                class="nav-item-btn"
+                class="nav-tile-btn"
                 :class="{ active: themeMenuOpen }"
                 @click.stop="themeMenuOpen = !themeMenuOpen"
                 title="切换界面配色"
               >
                 <!-- Sun / Brightness Icon -->
-                <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="#333333" stroke-width="1.8">
+                <svg class="nav-svg-icon" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.8">
                   <circle cx="10" cy="10" r="3"/>
                   <path d="M10 2V4M10 16V18M2 10H4M16 10H18M4.34 4.34L5.76 5.76M14.24 14.24L15.66 15.66M4.34 15.66L5.76 14.24M14.24 5.76L15.66 4.34"/>
                 </svg>
@@ -128,6 +150,51 @@
                     <path d="M4 6L8 10L12 6"/>
                   </svg>
                 </button>
+              </div>
+
+              <!-- 当前登录用户：头像点开显示账号信息 + 退出登录（认证状态见 stores/auth.js） -->
+              <div class="user-menu-wrap">
+                <button
+                  class="user-avatar-btn"
+                  :class="{ active: userMenuOpen }"
+                  @click.stop="userMenuOpen = !userMenuOpen"
+                  :title="`${auth.displayName}${auth.roleLabel ? ' · ' + auth.roleLabel : ''}`"
+                >
+                  <span class="avatar-initials">{{ auth.initials }}</span>
+                  <span class="avatar-presence"></span>
+                </button>
+
+                <transition name="pop-fade">
+                  <div v-if="userMenuOpen" class="user-popover">
+                    <div class="user-popover-head">
+                      <span class="user-popover-avatar">{{ auth.initials }}</span>
+                      <div class="user-popover-meta">
+                        <strong>{{ auth.displayName }}</strong>
+                        <span>{{ userMetaLine }}</span>
+                      </div>
+                    </div>
+
+                    <div class="user-popover-rows">
+                      <div class="user-popover-row">
+                        <span>账号</span>
+                        <b>{{ auth.user?.username || '--' }}</b>
+                      </div>
+                      <div class="user-popover-row">
+                        <span>上次登录</span>
+                        <b>{{ auth.user?.last_login_at || '首次登录' }}</b>
+                      </div>
+                    </div>
+
+                    <button class="user-logout-btn" @click="handleLogout">
+                      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6">
+                        <path d="M6.5 3H3.8A1.8 1.8 0 002 4.8v6.4A1.8 1.8 0 003.8 13h2.7" stroke-linecap="round"/>
+                        <path d="M10.5 5.5L13 8l-2.5 2.5M13 8H6.5" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                      <span>退出登录</span>
+                    </button>
+                  </div>
+                </transition>
+                <div v-if="userMenuOpen" class="user-popover-mask" @click="userMenuOpen = false"></div>
               </div>
             </div>
           </header>
@@ -880,7 +947,21 @@
                 >
                   <div v-if="msg.searchQuery" class="di-search-tag">🔍 已联网检索: {{ msg.searchQuery }}</div>
                   <div v-if="msg.role === 'user'" class="msg-plain">{{ msg.text }}</div>
-                  <div v-else class="msg-md" v-html="renderMsg(msg)"></div>
+                  <Streamdown
+                    v-else
+                    class="msg-stream"
+                    :class="{ 'is-streaming': aiTyping && i === messages.length - 1 }"
+                    :children="msg.text"
+                    :mode="aiTyping && i === messages.length - 1 ? 'streaming' : 'static'"
+                    :is-animating="aiTyping && i === messages.length - 1"
+                    :animated="{
+                      animation: 'blurIn',
+                      duration: 450,
+                      easing: 'cubic-bezier(0.25, 0.6, 0.3, 1)',
+                      sep: 'word'
+                    }"
+                    caret="circle"
+                  />
                 </div>
               </div>
               <div v-if="isThinking" class="di-msg-row ai">
@@ -1259,16 +1340,29 @@
       </div>
     </div>
     </Transition>
+    <!-- Drone Recommendation Modal（无人机推荐 · DJI 商城）
+         完整复刻大疆商城风格的商品详情页：版本切换 / 价格同步 / 官方购买跳转 / 购物车 / 收藏
+         弹窗特效：与病害图鉴同款 hero-video-dialog spring 编排（v-if 必须放在 Transition 内部才能触发进入/离开动画） -->
+    <Transition :css="false" @enter="onKbDialogEnter" @leave="onKbDialogLeave">
+      <DjiAir3Shop v-if="activeModal === 'djiShop'" @close="activeModal = null" />
+    </Transition>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { ref, reactive, computed, onMounted, onUnmounted, nextTick } from 'vue'
+import { useRouter } from 'vue-router'
+import { Aim, Setting } from '@element-plus/icons-vue'
 import axios from 'axios'
 import { animate } from 'motion'
 import gsap from 'gsap'
-import { marked } from 'marked'
 import * as echarts from 'echarts'
+// Streamdown（Vue 版）：AI 流式 Markdown 渲染器，自带逐词渐显动画 + 流式光标，
+// 替代手写的字符级 fade 后处理（对齐 Vercel Streamdown / ChatGPT 的渐变吐字效果）
+import { Streamdown } from '@brucekit/streamdown-vue'
+import '@brucekit/streamdown-vue/styles.css'
+import { useAuthStore } from '@/stores/auth'
+import { authToken, redirectToLogin } from '@/utils/http'
 
 // ── Magic UI effects (shadcn registry · @magicui) ─────────────────────
 import MagicCard from '@/components/effects/magicui/MagicCard.vue'
@@ -1276,6 +1370,7 @@ import NumberTicker from '@/components/effects/magicui/NumberTicker.vue'
 import ShineBorder from '@/components/effects/magicui/ShineBorder.vue'
 import BorderBeam from '@/components/effects/magicui/BorderBeam.vue'
 import PulsatingButton from '@/components/effects/magicui/PulsatingButton.vue'
+import DjiAir3Shop from './DjiAir3Shop.vue'
 
 // ── State ─────────────────────────────────────────────────────────────
 const activeNav = ref('home')
@@ -1283,6 +1378,25 @@ const activeModal = ref(null)
 const showDiagWorkstation = ref(false)
 const scaleFactor = ref(1)
 const boardWidth = ref(1194)
+
+// ── 登录用户（令牌与用户信息由 stores/auth.js 管理）─────────────────────
+const router = useRouter()
+const auth = useAuthStore()
+const userMenuOpen = ref(false)
+
+// 显示名与角色同名时（如 admin 的「系统管理员」）副标题改显示账号，避免两行重复
+const userMetaLine = computed(() => {
+  const role = auth.roleLabel || ''
+  const name = auth.displayName || ''
+  if (!role || role === name) return auth.user?.username ? `@${auth.user.username}` : '已登录'
+  return role
+})
+
+async function handleLogout() {
+  userMenuOpen.value = false
+  await auth.logout()
+  router.replace({ path: '/login', query: { reason: '已退出登录' } })
+}
 
 const currentSector = ref('菠菜园 08 区')
 const presetSamples = ref([])
@@ -1614,7 +1728,8 @@ async function openKnowledge() {
 // React 版的 AnimatePresence + motion.div 对应 Vue 的 <Transition :css="false"> + motion 的
 // animate()（与 NumberTicker.vue 同一依赖通道）。
 async function onKbDialogEnter(el, done) {
-  const card = el.querySelector('.tanee-modal-card')
+  // 同时兼容病害图鉴卡片与无人机推荐弹窗卡片
+  const card = el.querySelector('.tanee-modal-card, .dji-shop-card')
   if (!card || typeof animate !== 'function') { done(); return }
   // 起始态在本帧绘制前内联写死，避免弹窗闪现原始尺寸
   el.style.opacity = '0'
@@ -1634,7 +1749,7 @@ async function onKbDialogEnter(el, done) {
 }
 
 async function onKbDialogLeave(el, done) {
-  const card = el.querySelector('.tanee-modal-card')
+  const card = el.querySelector('.tanee-modal-card, .dji-shop-card')
   if (!card || typeof animate !== 'function') { done(); return }
   try {
     await Promise.all([
@@ -2054,8 +2169,6 @@ const aiTyping = ref(false)
 const toolStatus = ref('')
 const chatBodyRef = ref(null)
 
-marked.setOptions({ gfm: true, breaks: true })
-
 // 思考中：消息已发出、首个 delta 未到、也无联网检索提示
 const isThinking = computed(
   () =>
@@ -2064,12 +2177,8 @@ const isThinking = computed(
     messages.value[messages.value.length - 1]?.role === 'user'
 )
 
-// AI 回复按 markdown 渲染（流式分片同样适用）；用户消息纯文本防注入
-function renderMsg(msg) {
-  if (msg.role === 'user') return ''
-  if (!msg.text) return ''
-  return marked.parse(msg.text)
-}
+// AI 回复的 Markdown 改由 <Streamdown> 组件渲染（模板内）：
+// 流式模式下自动修复残缺语法、逐词渐显、带光标；历史消息走 static 模式
 
 const fastQuestions = [
   '玉米灰斑病用什么药最有效？',
@@ -2177,6 +2286,47 @@ function startNewSession() {
 // （此前声明在 sendMessage 内部，导致点「停止」时抛 ReferenceError）
 let chatAbort = null
 
+// ── Typewriter 匀速缓冲（ChatGPT 手感的第一层）──────────────────────────
+// LLM 吐 token 忽快忽慢（网络抖动 / 网关合批），直接来一个上屏一个会"哗蹦一段又停半秒"。
+// 这里把接收与显示拆开：delta 先进缓冲区，rAF 以固定帧率匀速取字上屏；
+// 新字渐显（gradient tail）由 <Streamdown animated> 组件负责，两层各司其职。
+function createTyper(onUpdate) {
+  let pending = ''   // 已收到、待上屏
+  let displayed = '' // 已上屏
+  let rafId = null
+
+  function tick() {
+    if (pending.length) {
+      // 自适应取字量：底速 2 字/帧，积压越多吐得越快（封顶 10），保证既匀速又追得上高速流
+      const take = Math.min(Math.max(2, Math.ceil(pending.length / 40)), 10, pending.length)
+      displayed += pending.slice(0, take)
+      pending = pending.slice(take)
+      onUpdate(displayed)
+    }
+    rafId = pending.length ? requestAnimationFrame(tick) : null
+  }
+
+  return {
+    push(chunk) {
+      pending += chunk
+      if (rafId === null) rafId = requestAnimationFrame(tick)
+    },
+    // 流结束/中断时调用：把余量一次性上屏，避免「网络已结束、UI 还在逐字蹦」
+    flush() {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      if (pending.length) {
+        displayed += pending
+        pending = ''
+        onUpdate(displayed)
+      }
+    },
+    dispose() {
+      if (rafId !== null) { cancelAnimationFrame(rafId); rafId = null }
+      pending = ''
+    }
+  }
+}
+
 async function sendMessage() {
   const query = inputText.value.trim()
   if (!query || aiTyping.value) return
@@ -2199,14 +2349,29 @@ async function sendMessage() {
   }
 
   let hasAiMsg = false
+  let aiMsg = null // 本轮 AI 气泡的引用（首个 delta 时创建）
   chatAbort = null
+
+  // 打字机缓冲：delta 不直接上屏，经 rAF 匀速释放（onUpdate 只在真正吐字时触发）
+  const typer = createTyper((text) => {
+    if (aiMsg) aiMsg.text = text
+    const body = chatBodyRef.value
+    if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
+      body.scrollTop = body.scrollHeight
+    }
+  })
 
   try {
     // AbortController：用户点「停止」时可中断生成，后端检测到断连即终止上游请求
     chatAbort = new AbortController()
+    const sseToken = authToken()
     const response = await fetch('/api/screen/chat/stream', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        // 原生 fetch 不走 axios 拦截器，令牌要手动带上
+        ...(sseToken ? { Authorization: `Bearer ${sseToken}` } : {})
+      },
       signal: chatAbort.signal,
       body: JSON.stringify({
         message: query,
@@ -2226,6 +2391,11 @@ async function sendMessage() {
         }
       })
     })
+
+    if (response.status === 401) {
+      redirectToLogin('登录状态已失效，请重新登录')
+      return
+    }
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
@@ -2270,30 +2440,31 @@ async function sendMessage() {
           } else if (evt.type === 'delta') {
             if (!hasAiMsg) {
               hasAiMsg = true
-              messages.value.push({
+              aiMsg = reactive({
                 role: 'ai',
                 text: '',
                 searchQuery: toolStatus.value ? toolStatus.value.replace(/.*「(.*)」.*/, '$1') : ''
               })
+              messages.value.push(aiMsg)
             }
             toolStatus.value = ''
-            const lastMsg = messages.value[messages.value.length - 1]
-            lastMsg.text += evt.content
-            const body = chatBodyRef.value
-            if (body && body.scrollHeight - body.scrollTop - body.clientHeight < 80) {
-              body.scrollTop = body.scrollHeight
-            }
+            // 进缓冲区由 rAF 匀速上屏，不再逐 chunk 直写
+            typer.push(evt.content)
           }
         } catch (e) {
           console.warn('解析流式消息异常:', e)
         }
       }
     }
+
+    // 流正常结束：把缓冲区余量一次性上屏
+    typer.flush()
   } catch (err) {
     if (err?.name === 'AbortError') {
-      // 用户主动停止：在已有回答后追加标记，避免误以为是异常
-      if (hasAiMsg) {
-        messages.value[messages.value.length - 1].text += '\n\n⏹ 已停止生成'
+      // 用户主动停止：先冲掉缓冲区已生成的内容，再追加标记，避免误以为是异常
+      typer.flush()
+      if (hasAiMsg && aiMsg) {
+        aiMsg.text += '\n\n⏹ 已停止生成'
       } else {
         messages.value.push({ role: 'ai', text: '⏹ 已停止生成。' })
       }
@@ -2307,6 +2478,8 @@ async function sendMessage() {
       }
     }
   } finally {
+    // 兜底：任何路径退出都停掉 rAF 循环，防止计时器泄漏
+    typer.dispose()
     aiTyping.value = false
     chatAbort = null
   }
@@ -2450,6 +2623,7 @@ function handleResize() {
 onMounted(() => {
   handleResize()
   window.addEventListener('resize', handleResize)
+  auth.fetchMe() // 用本地令牌换最新的用户信息（角色、上次登录时间）
   loadSamples()
   restartCarousel()
   refreshHistoryStats() // 历史弹窗顶部「今日 N 次 · 共 M 条」
@@ -2515,7 +2689,7 @@ onUnmounted(() => {
   box-sizing: border-box;
 }
 
-/* ════════════════════ 1. SIDEBAR (103px) ════════════════════ */
+/* ════════════════════ 1. SIDEBAR (103px · 深墨绿) ════════════════════ */
 .tanee-sidebar {
   width: 103px;
   height: 834px;
@@ -2525,6 +2699,7 @@ onUnmounted(() => {
   justify-content: space-between;
   box-sizing: border-box;
   flex-shrink: 0;
+  background: linear-gradient(180deg, #16302a 0%, #10231d 55%, #0d1d18 100%);
 }
 
 .brand-frame {
@@ -2556,14 +2731,52 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
+  width: 100%;
 
   &.upper {
-    margin-top: 48px;
+    margin-top: 14px;
   }
 
   &.lower {
-    margin-bottom: 24px;
+    margin-top: auto;
+    margin-bottom: 16px;
+    gap: 10px;
+  }
+}
+
+/* 主导航项：图标 + 文字，选中态为亮绿渐变圆角块 */
+/* 品牌标签：占原来「个人中心」按钮的位置，纯展示
+   pointer-events: none 保证既点不进去、也不会弹出任何悬浮提示 */
+.brand-sticker {
+  width: 88px;
+  padding: 13px 8px 14px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #123620 0%, #0c2a1a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+
+  .sticker-leaf {
+    width: 22px;
+    height: 22px;
+    color: #6fbf8c;
+    margin-bottom: 5px;
+    opacity: 0.92;
+  }
+
+  .sticker-line {
+    font-size: 10px;
+    line-height: 1.55;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.74);
+    white-space: nowrap;
   }
 }
 
@@ -2602,12 +2815,68 @@ onUnmounted(() => {
 }
 
 .nav-item-btn {
-  width: 60px;
-  height: 60px;
+  width: 68px;
+  height: 58px;
   border-radius: 12px;
   border: none;
-  background: #ffffff;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background: transparent;
+  color: #93a79c;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+
+  .nav-svg-icon {
+    width: 20px;
+    height: 20px;
+  }
+
+  .nav-label {
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+  }
+
+  /* 白色原始填充的 SVG（icon-16 房子 fill="white"）：非选中时转为浅灰绿，
+     选中态反白 */
+  .white-filter {
+    filter: brightness(0) invert(0.72);
+    transition: filter 0.15s ease;
+  }
+
+  &.active {
+    background: linear-gradient(155deg, #2fae6f 0%, #1d8a52 100%);
+    color: #ffffff;
+    box-shadow: 0 6px 14px rgba(53, 197, 110, 0.38);
+
+    .white-filter {
+      filter: brightness(0) invert(1);
+    }
+  }
+
+  &:hover:not(.active) {
+    background: rgba(255, 255, 255, 0.06);
+    color: #d8e6de;
+
+    .white-filter {
+      filter: brightness(0) invert(0.9);
+    }
+  }
+}
+
+/* 底部功能区：主题切换小方块 */
+.nav-tile-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: none;
+  background: rgba(255, 255, 255, 0.07);
+  color: #aebfb5;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2619,26 +2888,14 @@ onUnmounted(() => {
     height: 20px;
   }
 
-  /* 白色原始填充的 SVG（icon-16 房子 fill="white"）：非选中时转为 #333333，
-     与内联描边图标同色，避免白底白图标"隐形"；选中态由 .active 反白 */
-  .white-filter {
-    filter: brightness(0) invert(0.2);
-    transition: filter 0.15s ease;
-  }
-
-  &.active {
-    background: #1e2024;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-
-    .white-filter {
-      filter: brightness(0) invert(1);
-    }
-  }
-
-  &:hover:not(.active) {
-    background: #f8f8f8;
+  &.active,
+  &:hover {
+    background: rgba(255, 255, 255, 0.14);
+    color: #ffffff;
   }
 }
+
+/* 底部品牌块样式已删除：入口按钮换成纯展示的 .brand-sticker（见上） */
 
 /* ════════════════════ 2. BODY (1091px) ════════════════════ */
 .tanee-body {
@@ -2758,6 +3015,174 @@ onUnmounted(() => {
       height: 12px;
     }
   }
+}
+
+/* ── 当前登录用户：头像按钮 + 账号弹层 ───────────────────────────────── */
+.user-menu-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.user-avatar-btn {
+  position: relative;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: none;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(46, 144, 85, 0.28);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+
+  &:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(46, 144, 85, 0.34);
+  }
+
+  &.active {
+    box-shadow: 0 0 0 3px rgba(53, 197, 110, 0.2);
+  }
+
+  .avatar-presence {
+    position: absolute;
+    right: -1px;
+    bottom: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 9999px;
+    background: #17b26a;
+    border: 2px solid #ffffff;
+  }
+}
+
+.user-popover {
+  position: absolute;
+  top: 44px;
+  right: 0;
+  width: 236px;
+  padding: 14px;
+  box-sizing: border-box;
+  border-radius: 12px;
+  background: #ffffff;
+  border: 1px solid rgba(24, 27, 37, 0.06);
+  box-shadow: 0 16px 40px rgba(24, 27, 37, 0.16);
+  z-index: 90;
+}
+
+.user-popover-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  .user-popover-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 9999px;
+    background: linear-gradient(135deg, #35c56e 0%, #2e9055 100%);
+    color: #ffffff;
+    font-size: 14px;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+  }
+
+  .user-popover-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+
+    strong {
+      font-size: 13.5px;
+      font-weight: 700;
+      color: #181b25;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    span {
+      font-size: 11.5px;
+      color: #8d8d8d;
+    }
+  }
+}
+
+.user-popover-rows {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #f0f0f0;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.user-popover-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 11.5px;
+
+  span {
+    color: #a4a4a4;
+    flex-shrink: 0;
+  }
+
+  b {
+    font-weight: 600;
+    color: #333333;
+    text-align: right;
+  }
+}
+
+.user-logout-btn {
+  margin-top: 12px;
+  width: 100%;
+  height: 34px;
+  border-radius: 8px;
+  border: 1px solid #f5dedb;
+  background: #fef5f4;
+  color: #cf3a28;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+
+  svg {
+    width: 14px;
+    height: 14px;
+  }
+
+  &:hover {
+    background: #fdeceb;
+    border-color: #f1cbc6;
+  }
+}
+
+/* 透明遮罩：点画板任意位置收起弹层（画板有 transform，fixed 会相对画板铺满） */
+.user-popover-mask {
+  position: fixed;
+  inset: 0;
+  z-index: 89;
+  background: transparent;
 }
 
 /* 2.2 Main Content Layout (16px Padding, 2 Columns) */
@@ -4444,6 +4869,93 @@ onUnmounted(() => {
           a { color: #6ee7b0; text-decoration: underline; }
 
           hr { border: none; border-top: 1px solid rgba(255, 255, 255, 0.14); margin: 8px 0; }
+        }
+
+        /* Streamdown（Vue 版）渲染容器：跟随深色气泡配色。
+           库默认样式面向浅色背景（shadcn 变量），这里整体反转成继承气泡文字色 */
+        :deep(.msg-stream) {
+          font-size: 12.5px;
+          line-height: 1.55;
+          word-break: break-word;
+          color: rgba(232, 234, 237, 0.92);
+
+          p { margin: 0 0 6px; &:last-child { margin-bottom: 0; } }
+
+          h1, h2, h3, h4, h5, h6 {
+            margin: 8px 0 6px;
+            font-size: 13px;
+            font-weight: 700;
+            color: #ffffff;
+          }
+
+          ul, ol { margin: 4px 0; padding-left: 18px; li { margin: 2px 0; } }
+
+          strong { color: #ffffff; font-weight: 700; }
+
+          code {
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 11.5px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 1px 5px;
+            border-radius: 4px;
+            color: #7ee2a8;
+          }
+
+          pre {
+            background: rgba(0, 0, 0, 0.45);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 10px 12px;
+            margin: 6px 0;
+            overflow-x: auto;
+
+            code { background: none; padding: 0; color: #d7dce2; }
+          }
+
+          a { color: #6ee7b0; text-decoration: underline; }
+
+          table {
+            border-collapse: collapse;
+            margin: 6px 0;
+            font-size: 11.5px;
+            max-width: 100%;
+
+            th, td {
+              border: 1px solid rgba(255, 255, 255, 0.14);
+              padding: 5px 9px;
+              text-align: left;
+            }
+
+            th {
+              background: rgba(255, 255, 255, 0.08);
+              color: #ffffff;
+              font-weight: 600;
+            }
+
+            tr:nth-child(even) td { background: rgba(255, 255, 255, 0.04); }
+          }
+
+          blockquote {
+            margin: 6px 0;
+            padding: 4px 10px;
+            border-left: 3px solid #35c56e;
+            background: rgba(53, 197, 110, 0.08);
+            border-radius: 0 6px 6px 0;
+            color: rgba(232, 234, 237, 0.85);
+          }
+
+          /* 流式光标（库自带 circle caret）：用品牌绿 */
+          [data-streamdown-caret],
+          .sd-caret {
+            background-color: #35c56e !important;
+          }
+        }
+
+        /* 技术三：渐变遮罩——正在流式的块底缘做柔和淡出，
+           新内容像从雾里"长"出来，而不是硬切换出现 */
+        :deep(.msg-stream.is-streaming > *:last-child) {
+          -webkit-mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 86%, transparent 100%);
+          mask-image: linear-gradient(to bottom, #000 62%, rgba(0, 0, 0, 0.45) 86%, transparent 100%);
         }
       }
 

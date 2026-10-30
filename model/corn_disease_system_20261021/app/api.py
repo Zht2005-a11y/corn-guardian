@@ -5,6 +5,11 @@
     # 或：python app/api.py
 
 接口一览（统一响应格式 {code, message, data, request_id, elapsed_ms}）：
+    POST /auth/login           账号密码登录（返回 Bearer 令牌，勾选记住我 7 天有效）
+    POST /auth/register        注册账号
+    GET  /auth/me              当前登录用户
+    POST /auth/logout          退出登录（令牌立即失效）
+    GET  /auth/config          登录页配置（注册开关 / 演示账号）
     GET  /                     服务首页（接口自述，避免"忘记地址"）
     GET  /health               健康检查（含模型加载状态、设备、缓存命中）
     GET  /models               可用模型列表 + 类别映射
@@ -117,16 +122,12 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
+from app.auth import check_request as auth_check
+from app.auth import router as auth_router
 from app.bigscreen_api import router as screen_router
-app.include_router(screen_router)
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=SERVER_CFG.get("cors_origins", ["*"]),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+app.include_router(auth_router)
+app.include_router(screen_router)
 
 
 # ==========================================================================
@@ -136,6 +137,16 @@ app.add_middleware(
 async def add_request_context(request: Request, call_next):
     rid = request.headers.get("X-Request-Id") or uuid.uuid4().hex[:12]
     t0 = time.perf_counter()
+
+    # ---- 登录认证：除公开路径（/、/health、/auth/*、Swagger）外一律要求令牌 ----
+    denied = auth_check(request)
+    if denied is not None:
+        status_code, body = denied
+        resp = JSONResponse(status_code=status_code, content={**body, "request_id": rid})
+        resp.headers["X-Request-Id"] = rid
+        resp.headers["X-Elapsed-Ms"] = "0.0"
+        return resp
+
     try:
         response = await call_next(request)
     except Exception:  # 兜底，保证不会返回裸 500 堆栈给前端
@@ -148,6 +159,17 @@ async def add_request_context(request: Request, call_next):
     response.headers["X-Request-Id"] = rid
     response.headers["X-Elapsed-Ms"] = str(elapsed)
     return response
+
+
+# CORS 必须最后注册：Starlette 后加的外层，这样鉴权失败返回的 401 也会带上跨域头，
+# 前端才能读到「登录已过期」而不是被浏览器吞成 Network Error。
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=SERVER_CFG.get("cors_origins", ["*"]),
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.exception_handler(InvalidImageError)

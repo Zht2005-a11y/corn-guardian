@@ -3,6 +3,7 @@ import { createPinia } from 'pinia'
 
 import App from './App.vue'
 import router from './router'
+import '@/utils/http' // 全局 axios：统一带令牌 + 401 跳登录
 import 'element-plus/dist/index.css'
 import '@/assets/style/global.scss'
 import '@/assets/style/magicui-effects.css'

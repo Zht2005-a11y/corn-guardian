@@ -99,12 +99,42 @@ app/bigscreen_api.py:24  APIRouter(prefix="/screen")
 - 批量上限：20 张（`api.py:60`、`api.py:342-343`）。
 - 大屏接口走 base64 JSON，不受 multipart 10MB 限制，但仍校验图片尺寸与格式。
 
+### 3.4 登录认证（`app/auth.py`）
+
+除 `GET /`、`GET /health`、`GET /favicon.ico`、`GET /docs*`、`/openapi.json` 与 `/auth/*` 外，
+**所有接口都需要令牌**，否则返回 `401 {"code":401,"message":"未登录或登录已过期，请先登录","data":null}`。
+
+令牌投递方式（三选一，优先级从上到下）：
+
+1. `Authorization: Bearer <token>`
+2. `?token=<token>`（SSE / `<img>` 等无法设置请求头的场景）
+3. Cookie `corn_token`（登录接口会同时下发）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| POST | `/auth/login` | `{username, password, remember}` → `{token, token_type, expires_in, expires_at, user}` |
+| POST | `/auth/register` | `{username, password, display_name}`，注册成功需再调登录 |
+| GET | `/auth/me` | 当前用户 + 角色 + 上次登录时间 |
+| POST | `/auth/logout` | 注销当前令牌（写入 `revoked_tokens`，立即失效） |
+| GET | `/auth/config` | 登录页配置：是否允许注册、演示账号、令牌有效期、JWT 算法与签发实现 |
+
+令牌为**标准 JWT（HS256）**，由 PyJWT 签发校验（未安装时退化为内置 HS256 实现，两者互认）；
+claims 含 `sub / uid / name / role / iss / aud / iat / nbf / exp / jti`，
+`iss = corn-guardian`、`aud = corn-guardian-web`，签名密钥来自 `CORN_AUTH_SECRET`。
+默认 12 小时，`remember=true` 延长到 7 天。账号连续 5 次密码错误锁定 5 分钟。
+`/auth/config` 会返回当前实际使用的 `jwt_alg` 与 `jwt_backend`，便于排查。
+
 ---
 
 ## 4. 接口总览
 
 | # | 方法 | 后端路径 | 前端路径 | 前端是否调用 | 分组 |
 |---|---|---|---|---|---|
+| 0a | POST | `/auth/login` | `/api/auth/login` | ✅（登录页） | 认证 |
+| 0b | POST | `/auth/register` | `/api/auth/register` | ✅（注册页） | 认证 |
+| 0c | GET | `/auth/me` | `/api/auth/me` | ✅（大屏用户信息） | 认证 |
+| 0d | POST | `/auth/logout` | `/api/auth/logout` | ✅（退出登录） | 认证 |
+| 0e | GET | `/auth/config` | `/api/auth/config` | ✅（登录页配置） | 认证 |
 | 1 | GET | `/screen/samples` | `/api/screen/samples` | ✅ | 大屏 |
 | 2 | POST | `/screen/predict` | `/api/screen/predict` | ✅ | 大屏 |
 | 3 | POST | `/screen/chat` | `/api/screen/chat` | ✅ | 大屏 |

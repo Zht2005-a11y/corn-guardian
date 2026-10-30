@@ -77,6 +77,41 @@ start_all.bat
 
 ---
 
+## 🔐 登录认证
+
+大屏与全部业务接口（`/screen/*`、`/predict*` 等）默认需要登录，未登录会自动跳转登录页并记住原访问地址。
+
+**演示账号**（首次启动自动创建，登录页可一键填充）：
+
+| 账号 | 密码 | 角色 |
+|---|---|---|
+| `admin` | `corn@2026` | 系统管理员 |
+| `agronomist` | `field@2026` | 农艺师 |
+
+登录页也支持自助注册（右下角「立即注册」）。
+
+**实现要点**（详见 `model/corn_disease_system_20261021/app/auth.py`）：
+
+- 密码用标准库 `pbkdf2_hmac(sha256, 210000 轮)` 加盐哈希，不引第三方加密库；
+- 令牌为**标准 JWT（HS256）**，由 PyJWT 签发校验，claims 含 `sub / uid / name / role / iss / aud / iat / nbf / exp / jti`；
+  默认 12 小时，勾选「记住我」后 7 天；可直接贴到 jwt.io 用密钥验证；
+- 服务端用 `revoked_tokens` 表记录已注销令牌的 `jti`，退出登录后立即失效；
+- 同一账号连续 5 次密码错误锁定 5 分钟，账号不存在与密码错误返回同一提示，避免枚举账号；
+- 前端令牌存 `localStorage`，axios 拦截器统一注入 `Authorization: Bearer`，遇 401 自动清理并跳登录页；
+- 用户数据落在 `history/auth.db`、JWT 签名密钥落在 `history/auth_secret.key`，该目录已在 `.gitignore` 中排除。
+
+**可配置环境变量**：
+
+| 变量 | 作用 |
+|---|---|
+| `CORN_AUTH_SECRET` | JWT 签名密钥（HS256，多实例部署时必须一致；不设则自动生成并落盘，建议 ≥32 字节） |
+| `CORN_AUTH_ADMIN_PASSWORD` | 首次初始化时 `admin` 的密码 |
+| `CORN_AUTH_ALLOW_REGISTER` | 设为 `0` 关闭自助注册 |
+
+> 首次部署后请立即修改默认密码（或通过 `CORN_AUTH_ADMIN_PASSWORD` 指定），生产环境建议配合 HTTPS 使用。
+
+---
+
 ## 📁 目录结构
 
 ```text
