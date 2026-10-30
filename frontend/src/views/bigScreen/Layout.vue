@@ -1340,7 +1340,6 @@
       </div>
     </div>
     </Transition>
-
     <!-- Drone Recommendation Modal（无人机推荐 · DJI 商城）
          完整复刻大疆商城风格的商品详情页：版本切换 / 价格同步 / 官方购买跳转 / 购物车 / 收藏
          弹窗特效：与病害图鉴同款 hero-video-dialog spring 编排（v-if 必须放在 Transition 内部才能触发进入/离开动画） -->
@@ -2747,6 +2746,40 @@ onUnmounted(() => {
 }
 
 /* 主导航项：图标 + 文字，选中态为亮绿渐变圆角块 */
+/* 品牌标签：占原来「个人中心」按钮的位置，纯展示
+   pointer-events: none 保证既点不进去、也不会弹出任何悬浮提示 */
+.brand-sticker {
+  width: 88px;
+  padding: 13px 8px 14px;
+  box-sizing: border-box;
+  border-radius: 16px;
+  background: linear-gradient(160deg, #123620 0%, #0c2a1a 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  cursor: default;
+  user-select: none;
+  pointer-events: none;
+
+  .sticker-leaf {
+    width: 22px;
+    height: 22px;
+    color: #6fbf8c;
+    margin-bottom: 5px;
+    opacity: 0.92;
+  }
+
+  .sticker-line {
+    font-size: 10px;
+    line-height: 1.55;
+    letter-spacing: 0.02em;
+    color: rgba(255, 255, 255, 0.74);
+    white-space: nowrap;
+  }
+}
+
 /* 品牌标签：占原来「个人中心」按钮的位置，纯展示
    pointer-events: none 保证既点不进去、也不会弹出任何悬浮提示 */
 .brand-sticker {
